@@ -1,0 +1,68 @@
+import { GoogleGenAI, Chat, Type } from "@google/genai";
+import { getSystemPrompt, getCoachPrompt } from '../constants';
+import { Message, EvaluationResult } from "../types";
+
+let ai: GoogleGenAI | null = null;
+
+const getAI = (): GoogleGenAI => {
+    if (!ai) {
+        if (!process.env.API_KEY) {
+            throw new Error("API_KEY environment variable not set");
+        }
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+    return ai;
+}
+
+export const createChatSession = (studentName: string): Chat => {
+    const genAI = getAI();
+    const systemInstruction = getSystemPrompt(studentName);
+    
+    const chat = genAI.chats.create({
+        model: 'gemini-2.5-pro',
+        config: {
+            systemInstruction: systemInstruction,
+            temperature: 0.7,
+            topP: 0.9,
+        },
+    });
+
+    return chat;
+};
+
+export const getEvaluation = async (messages: Message[], studentName: string): Promise<EvaluationResult> => {
+    const genAI = getAI();
+    const chatHistory = messages.map(msg => `${msg.role === 'user' ? studentName : 'CEO'}: ${msg.content}`).join('\n\n');
+    const prompt = getCoachPrompt(chatHistory, studentName);
+
+    const response = await genAI.models.generateContent({
+        model: 'gemini-2.5-pro',
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    criteria: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                question: { type: Type.STRING },
+                                score: { type: Type.NUMBER },
+                                feedback: { type: Type.STRING },
+                            },
+                            required: ['question', 'score', 'feedback'],
+                        },
+                    },
+                    totalScore: { type: Type.NUMBER },
+                    summary: { type: Type.STRING },
+                },
+                required: ['criteria', 'totalScore', 'summary'],
+            },
+        },
+    });
+    
+    const jsonString = response.text;
+    return JSON.parse(jsonString) as EvaluationResult;
+};

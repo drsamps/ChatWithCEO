@@ -43,7 +43,7 @@ const Evaluation: React.FC<EvaluationProps> = ({ result, studentName, onRestart 
                     <div className="flex justify-between items-start">
                         <p className="text-md font-semibold text-gray-800 flex-1 pr-4">{criterion.question}</p>
                         <div className="text-lg font-bold text-white bg-blue-600 rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0">
-                            {criterion.score}/2
+                            {criterion.score}/5
                         </div>
                     </div>
                     <p className="text-sm text-gray-600 mt-2 pl-1"><strong className="font-medium">Feedback:</strong> {criterion.feedback}</p>
@@ -53,7 +53,7 @@ const Evaluation: React.FC<EvaluationProps> = ({ result, studentName, onRestart 
         
         <div className="text-center pt-4 border-t">
              <div className="text-2xl font-bold text-gray-800 mb-4">
-                Total Score: {result.totalScore} / 6
+                Total Score: {result.totalScore} / 15
              </div>
             <button
               onClick={onRestart}

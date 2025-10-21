@@ -15,6 +15,12 @@ export enum ConversationPhase {
   EVALUATION_LOADING,
 }
 
+export enum CEOPersona {
+  STRICT = 'strict',
+  MODERATE = 'moderate',
+  LIBERAL = 'liberal',
+}
+
 export interface EvaluationCriterion {
   question: string;
   score: number;
@@ -25,4 +31,10 @@ export interface EvaluationResult {
   criteria: EvaluationCriterion[];
   totalScore: number;
   summary: string;
+}
+
+export interface Section {
+    section_id: string;
+    section_title: string;
+    year_term: string;
 }

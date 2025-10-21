@@ -1,23 +1,13 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
   isLoading: boolean;
-  shouldFocus?: boolean;
-  onFocusComplete?: () => void;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, isLoading, shouldFocus = false, onFocusComplete }) => {
+const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, isLoading }) => {
   const [message, setMessage] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (shouldFocus && !isLoading) {
-      textareaRef.current?.focus();
-      onFocusComplete?.();
-    }
-  }, [shouldFocus, isLoading, onFocusComplete]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +21,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ onSendMessage, isLoading, s
     <div className="p-4 bg-white border-t border-gray-200">
       <form onSubmit={handleSubmit} className="flex items-center space-x-4">
         <textarea
-          ref={textareaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={(e) => {

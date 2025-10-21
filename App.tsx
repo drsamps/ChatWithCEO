@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [conversationPhase, setConversationPhase] = useState<ConversationPhase>(ConversationPhase.PRE_CHAT);
   const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
+  const [shouldFocusInput, setShouldFocusInput] = useState<boolean>(false);
 
   const startConversation = useCallback(async (name: string) => {
     setIsLoading(true);
@@ -29,6 +30,7 @@ const App: React.FC = () => {
       
       setMessages([{ role: MessageRole.MODEL, content: firstMessage }]);
       setConversationPhase(ConversationPhase.CHATTING);
+      setShouldFocusInput(true);
       
     } catch (e) {
       console.error("Failed to start conversation:", e);
@@ -56,6 +58,7 @@ const App: React.FC = () => {
       const response = await chatSession.sendMessage({ message: userMessage });
       const modelMessage: Message = { role: MessageRole.MODEL, content: response.text };
       setMessages((prev) => [...prev, modelMessage]);
+      setShouldFocusInput(true);
     } catch (e) {
       console.error("Failed to send message:", e);
       const errorMessage: Message = {
@@ -64,6 +67,7 @@ const App: React.FC = () => {
       };
       setMessages((prev) => [...prev, errorMessage]);
       setError("An error occurred while communicating with the API.");
+      setShouldFocusInput(true);
     } finally {
       setIsLoading(false);
     }
@@ -102,6 +106,11 @@ const App: React.FC = () => {
     setError(null);
     setConversationPhase(ConversationPhase.PRE_CHAT);
     setEvaluationResult(null);
+    setShouldFocusInput(false);
+  };
+
+  const handleFocusComplete = () => {
+    setShouldFocusInput(false);
   };
 
   if (conversationPhase === ConversationPhase.PRE_CHAT) {
@@ -158,7 +167,7 @@ const App: React.FC = () => {
       <aside className="lg:w-2/3 xl:w-3/4 h-1/2 lg:h-full flex flex-col bg-gray-200 rounded-xl shadow-lg">
         {error && <div className="p-4 bg-red-500 text-white text-center font-semibold rounded-t-xl">{error}</div>}
         <ChatWindow messages={messages} isLoading={isLoading} />
-        <MessageInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+        <MessageInput onSendMessage={handleSendMessage} isLoading={isLoading} shouldFocus={shouldFocusInput} onFocusComplete={handleFocusComplete} />
       </aside>
     </div>
   );

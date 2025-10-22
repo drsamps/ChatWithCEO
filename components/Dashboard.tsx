@@ -23,7 +23,7 @@ interface StudentDetail {
   helpful: number | null;
 }
 
-type SortKey = 'completion_time' | 'score' | 'full_name';
+type SortKey = 'full_name' | 'persona' | 'score' | 'hints' | 'helpful' | 'completion_time';
 type SortDirection = 'asc' | 'desc';
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
@@ -171,7 +171,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortKey(key);
-      setSortDirection(key === 'full_name' ? 'asc' : 'desc');
+      setSortDirection(key === 'full_name' || key === 'persona' ? 'asc' : 'desc');
     }
   };
 
@@ -208,7 +208,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   return (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-800 font-sans">
       <header className="flex-shrink-0 flex justify-between items-center px-6 py-3 bg-white border-b border-gray-200 shadow-sm">
-        <h1 className="text-xl font-bold text-gray-900">Instructor Dashboard</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold text-gray-900">Instructor Dashboard</h1>
+          <a
+            href="https://supabase.com/dashboard/project/mytexuyqwuoyncdlaflq"
+            target="supabase"
+            rel="noopener noreferrer"
+            className="text-xs font-medium text-gray-500 hover:text-blue-600 hover:underline"
+          >
+            (to Supabase)
+          </a>
+        </div>
         <button onClick={onLogout} className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-md hover:bg-gray-100">
           <span>Sign Out</span>
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -280,10 +290,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                         <thead className="bg-gray-50">
                           <tr>
                             <SortableHeader label="Student Name" sortableKey="full_name" />
-                            <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CEO Persona</th>
+                            <SortableHeader label="CEO Persona" sortableKey="persona" />
                             <SortableHeader label="Score" sortableKey="score" />
-                            <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hints</th>
-                            <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Helpful</th>
+                            <SortableHeader label="Hints" sortableKey="hints" />
+                            <SortableHeader label="Helpful" sortableKey="helpful" />
                             <SortableHeader label="Completion Time" sortableKey="completion_time" />
                           </tr>
                         </thead>
@@ -292,9 +302,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                             <tr key={student.id} className="hover:bg-gray-50">
                               <td className="p-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.full_name}</td>
                               <td className="p-4 whitespace-nowrap text-sm text-gray-600">{student.persona ? student.persona.charAt(0).toUpperCase() + student.persona.slice(1) : <span className="text-gray-400">N/A</span>}</td>
-                              <td className="p-4 whitespace-nowrap text-sm">{student.score !== null ? `${student.score} / 15` : <span className="text-gray-400">N/A</span>}</td>
-                              <td className="p-4 whitespace-nowrap text-sm">{student.hints !== null ? student.hints : <span className="text-gray-400">N/A</span>}</td>
-                              <td className="p-4 whitespace-nowrap text-sm">{student.helpful !== null ? `${student.helpful.toFixed(1)} / 5` : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.score !== null ? `${student.score} / 15` : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.hints !== null ? student.hints : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.helpful !== null ? `${student.helpful.toFixed(1)} / 5` : <span className="text-gray-400">N/A</span>}</td>
                               <td className="p-4 whitespace-nowrap text-sm">{student.completion_time ? new Date(student.completion_time).toLocaleString() : <span className="text-gray-500 font-medium">Not Completed</span>}</td>
                             </tr>
                           ))}

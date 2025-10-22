@@ -53,10 +53,18 @@ const App: React.FC = () => {
         setIsReady(true);
     };
     
-    // Initial check on page load
-    handleRouteChange();
+    // On initial page load, always default to the student view.
+    // If the URL hash points to the admin page, we clear it.
+    // The 'hashchange' listener will then fire and call handleRouteChange,
+    // which will correctly set the view to 'student'.
+    if (window.location.hash === '#/admin') {
+        window.location.hash = '';
+    } else {
+        // If the hash is not '#/admin', we can safely perform the initial render check.
+        handleRouteChange();
+    }
 
-    // Listen for hash changes to handle navigation (e.g., back/forward buttons)
+    // Listen for hash changes to handle subsequent navigation (e.g., back/forward buttons, ctrl+click)
     window.addEventListener('hashchange', handleRouteChange);
     
     // Cleanup listener on component unmount
@@ -323,7 +331,17 @@ const App: React.FC = () => {
       <div className="flex items-center justify-center min-h-screen bg-gray-200">
         <div className="w-full max-w-md p-8 space-y-6 bg-white rounded-2xl shadow-xl">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-900">Chat with the CEO</h1>
+            <h1
+              className="text-3xl font-bold text-gray-900"
+              title="admin"
+              onClick={(e) => {
+                if (e.ctrlKey || e.metaKey) {
+                  window.location.hash = '#/admin';
+                }
+              }}
+            >
+              Chat with the CEO
+            </h1>
             <p className="mt-2 text-gray-600">You will have a brief opportunity to chat with the (simulated) CEO about the case. Enter your name and choose a persona to begin.</p>
           </div>
           <form onSubmit={handleNameSubmit} className="space-y-6">

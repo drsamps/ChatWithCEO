@@ -74,6 +74,14 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
             {isLoading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
+        <div className="text-center">
+          <button
+            onClick={() => window.location.hash = ''}
+            className="text-sm text-blue-600 hover:underline bg-transparent border-none p-0 cursor-pointer"
+          >
+            to Chatbot
+          </button>
+        </div>
       </div>
     </div>
   );

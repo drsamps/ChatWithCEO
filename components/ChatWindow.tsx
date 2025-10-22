@@ -1,13 +1,24 @@
 
 import React, { useRef, useEffect } from 'react';
-import { Message, MessageRole } from '../types';
+import { Message, MessageRole, CEOPersona } from '../types';
 
 interface ChatWindowProps {
   messages: Message[];
   isLoading: boolean;
+  ceoPersona: CEOPersona;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
+const renderMessageContent = (content: string) => {
+  const parts = content.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    return part;
+  });
+};
+
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -17,6 +28,8 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  const ceoTitle = `Kent Beck, ${ceoPersona.charAt(0).toUpperCase() + ceoPersona.slice(1)} CEO of Malawi's Pizza`;
 
   return (
     <div className="flex-1 p-6 space-y-6 overflow-y-auto">
@@ -28,8 +41,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
           }`}
         >
           {msg.role === MessageRole.MODEL && (
-            <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-              CEO
+            <div 
+              className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+              title={ceoTitle}
+            >
+              KB
             </div>
           )}
           <div
@@ -39,14 +55,17 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading }) => {
                 : 'bg-white text-gray-800 rounded-bl-none'
             }`}
           >
-            <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</p>
+            <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{renderMessageContent(msg.content)}</p>
           </div>
         </div>
       ))}
       {isLoading && (
         <div className="flex items-end gap-3 justify-start">
-          <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-            CEO
+          <div 
+            className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
+            title={ceoTitle}
+          >
+            KB
           </div>
           <div className="max-w-xs p-4 rounded-2xl shadow-md bg-white text-gray-800 rounded-bl-none">
             <div className="flex items-center justify-center space-x-1">

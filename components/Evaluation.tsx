@@ -10,7 +10,7 @@ interface EvaluationProps {
 const LoadingSpinner: React.FC = () => (
     <div className="flex flex-col items-center justify-center gap-4">
         <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
-        <p className="text-xl font-semibold text-gray-700">The Coach is reviewing your conversation...</p>
+        <p className="text-xl font-semibold text-gray-700">The AI Supervisor is reviewing your conversation to provide feedback...</p>
         <p className="text-gray-500">This may take a moment.</p>
     </div>
 );

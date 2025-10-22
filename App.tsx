@@ -1,7 +1,7 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Chat } from '@google/genai';
 import { Message, MessageRole, ConversationPhase, EvaluationResult, CEOPersona, Section } from './types';
-import { CEO_QUESTION } from './constants';
 import { createChatSession, getEvaluation } from './services/geminiService';
 import { supabase } from './services/supabaseClient';
 import BusinessCase from './components/BusinessCase';
@@ -34,6 +34,9 @@ const App: React.FC = () => {
   const [chatSession, setChatSession] = useState<Chat | null>(null);
   const [conversationPhase, setConversationPhase] = useState<ConversationPhase>(ConversationPhase.PRE_CHAT);
   const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
+  const [helpfulScore, setHelpfulScore] = useState<number | null>(null);
+  const [likedFeedback, setLikedFeedback] = useState<string | null>(null);
+  const [improveFeedback, setImproveFeedback] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -102,7 +105,7 @@ const App: React.FC = () => {
     const lastMessage = messages[messages.length - 1];
     if (
       !isLoading &&
-      conversationPhase === ConversationPhase.CHATTING &&
+      conversationPhase !== ConversationPhase.FEEDBACK_COMPLETE &&
       lastMessage?.role === MessageRole.MODEL
     ) {
       inputRef.current?.focus();
@@ -115,7 +118,7 @@ const App: React.FC = () => {
     try {
       const session = createChatSession(name, persona);
       setChatSession(session);
-      const firstMessage = `Hello ${name}. Let's get straight to it. ${CEO_QUESTION}`;
+      const firstMessage = `Hello ${name}, I am Kent Beck, the CEO of Malawi's Pizza. Thank you for meeting with me today. Our time is limited so let's get straight to my quandary: **Should we stay in the catering business, or is pizza catering a distraction from our core restaurant operations?**`;
       setMessages([{ role: MessageRole.MODEL, content: firstMessage }]);
       setConversationPhase(ConversationPhase.CHATTING);
     } catch (e) {
@@ -133,7 +136,7 @@ const App: React.FC = () => {
             const finalUserMessage: Message = { role: MessageRole.USER, content: userMessage };
             const ceoPermissionRequest: Message = {
                 role: MessageRole.MODEL,
-                content: `${studentFirstName}, thank you for meeting with me. I am glad you were able to study this case and share your insights. I hope our conversation was challenging but helpful. Would you be willing to give me a rating for my AI CEO profile?`
+                content: `${studentFirstName}, thank you for meeting with me. I am glad you were able to study this case and share your insights. I hope our conversation was challenging yet helpful. **Would you be willing to provide feedback by answering a few questions about our interaction?**`
             };
             setMessages(prev => [...prev, finalUserMessage, ceoPermissionRequest]);
             setConversationPhase(ConversationPhase.AWAITING_HELPFUL_PERMISSION);
@@ -171,34 +174,64 @@ const App: React.FC = () => {
         if (affirmative) {
             const ceoScoreRequest: Message = {
                 role: MessageRole.MODEL,
-                content: "On a scale of 1 to 5, where 5 means most helpful, how helpful was our conversation in helping you think about case facts?"
+                content: "Great! On a scale of 1 to 5, how helpful was our conversation in your thinking through this case situation? (1=not helpful, 5=extremely helpful)"
             };
             setMessages(prev => [...prev, ceoScoreRequest]);
             setConversationPhase(ConversationPhase.AWAITING_HELPFUL_SCORE);
         } else {
-            // Student declined or gave non-committal answer, end conversation.
-            await handleEndConversation(null);
+            // Student declined, proceed directly to evaluation without feedback.
+            await handleProceedToEvaluation();
         }
     } else if (conversationPhase === ConversationPhase.AWAITING_HELPFUL_SCORE) {
         const userScoreReply: Message = { role: MessageRole.USER, content: userMessage };
-        setMessages(prev => [...prev, userScoreReply]);
         
-        // Try to extract a number (integer or float) from the user's message.
         const numberMatch = userMessage.match(/\d(\.\d+)?/);
         let score: number | null = null;
         if (numberMatch && numberMatch[0]) {
             const parsedScore = parseFloat(numberMatch[0]);
-            // Ensure the parsed number is within the valid range [1, 5].
             if (!isNaN(parsedScore) && parsedScore >= 1 && parsedScore <= 5) {
                 score = parsedScore;
             }
         }
-        
-        await handleEndConversation(score);
+        setHelpfulScore(score);
+
+        const ceoLikedRequest: Message = {
+            role: MessageRole.MODEL,
+            content: "Thank you. What did you **like most** about this simulated conversation?",
+        };
+        setMessages(prev => [...prev, userScoreReply, ceoLikedRequest]);
+        setConversationPhase(ConversationPhase.AWAITING_LIKED_FEEDBACK);
+    } else if (conversationPhase === ConversationPhase.AWAITING_LIKED_FEEDBACK) {
+        const userLikedReply: Message = { role: MessageRole.USER, content: userMessage };
+        setLikedFeedback(userMessage);
+
+        const ceoImproveRequest: Message = {
+            role: MessageRole.MODEL,
+            content: "That's helpful. What way do you think this simulated conversation **might be improved**?",
+        };
+        setMessages(prev => [...prev, userLikedReply, ceoImproveRequest]);
+        setConversationPhase(ConversationPhase.AWAITING_IMPROVE_FEEDBACK);
+    } else if (conversationPhase === ConversationPhase.AWAITING_IMPROVE_FEEDBACK) {
+        const userImproveReply: Message = { role: MessageRole.USER, content: userMessage };
+        setImproveFeedback(userMessage);
+
+        const ceoGoodbyeMessage: Message = {
+            role: MessageRole.MODEL,
+            content: `Thank you for your feedback, ${studentFirstName}. Goodbye and have a nice day. I am going to turn this over to the AI Supervisor to give you feedback.`,
+        };
+        setMessages(prev => [...prev, userImproveReply, ceoGoodbyeMessage]);
+        setConversationPhase(ConversationPhase.FEEDBACK_COMPLETE);
     }
   };
 
-  const handleEndConversation = async (helpfulScore: number | null) => {
+  const sanitizeFeedback = (text: string | null): string | null => {
+    if (!text) return null;
+    // Light sanitization to remove common SQL injection characters as a defense-in-depth measure.
+    // Supabase client library already provides protection against SQL injection.
+    return text.replace(/;/g, '').replace(/--/g, '');
+  };
+
+  const handleProceedToEvaluation = async () => {
     if (!studentFirstName) return;
     setConversationPhase(ConversationPhase.EVALUATION_LOADING);
     setError(null);
@@ -208,6 +241,9 @@ const App: React.FC = () => {
       setEvaluationResult(result);
       
       if (studentDBId) {
+        const sanitizedLiked = sanitizeFeedback(likedFeedback);
+        const sanitizedImprove = sanitizeFeedback(improveFeedback);
+
         const { error: evaluationError } = await supabase
           .from('evaluations')
           .insert({
@@ -218,6 +254,8 @@ const App: React.FC = () => {
             persona: ceoPersona,
             hints: result.hints,
             helpful: helpfulScore,
+            liked: sanitizedLiked,
+            improve: sanitizedImprove,
           });
         if (evaluationError) console.error("Error saving evaluation:", evaluationError);
 
@@ -238,6 +276,14 @@ const App: React.FC = () => {
   const handleNameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tempFirstName.trim() || !tempLastName.trim()) return;
+    
+    // Prompt Injection Prevention: Validate names for allowed characters.
+    const nameRegex = /^[\p{L}\s'-]+$/u;
+    if (!nameRegex.test(tempFirstName.trim()) || !nameRegex.test(tempLastName.trim())) {
+        setError("Names can only contain letters, spaces, hyphens (-), and apostrophes (').");
+        setIsLoading(false);
+        return;
+    }
 
     setIsLoading(true);
     setError(null);
@@ -300,6 +346,9 @@ const App: React.FC = () => {
     setCeoPersona(CEOPersona.MODERATE);
     setSelectedSection('');
     setOtherSectionText('');
+    setHelpfulScore(null);
+    setLikedFeedback(null);
+    setImproveFeedback(null);
   };
 
   const handleAdminLogin = () => setIsAdminAuthenticated(true);
@@ -401,8 +450,19 @@ const App: React.FC = () => {
       </main>
       <aside className="lg:w-2/3 xl:w-3/4 h-1/2 lg:h-full flex flex-col bg-gray-200 rounded-xl shadow-lg">
         {error && <div className="p-4 bg-red-500 text-white text-center font-semibold rounded-t-xl">{error}</div>}
-        <ChatWindow messages={messages} isLoading={isLoading} />
-        <MessageInput ref={inputRef} onSendMessage={handleSendMessage} isLoading={isLoading} />
+        <ChatWindow messages={messages} isLoading={isLoading} ceoPersona={ceoPersona} />
+        {conversationPhase === ConversationPhase.FEEDBACK_COMPLETE ? (
+            <div className="p-4 bg-white border-t border-gray-200 flex justify-center items-center">
+                <button
+                    onClick={handleProceedToEvaluation}
+                    className="px-6 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 animate-pulse"
+                >
+                    Click here to engage the AI Supervisor
+                </button>
+            </div>
+        ) : (
+            <MessageInput ref={inputRef} onSendMessage={handleSendMessage} isLoading={isLoading} />
+        )}
       </aside>
     </div>
   );

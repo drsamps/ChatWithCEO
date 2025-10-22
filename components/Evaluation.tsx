@@ -15,6 +15,7 @@ const LoadingSpinner: React.FC = () => (
     </div>
 );
 
+// FIX: Correctly type the component's props using React.FC<EvaluationProps> to resolve type errors.
 const Evaluation: React.FC<EvaluationProps> = ({ result, studentName, onRestart }) => {
   if (!result) {
     return (
@@ -36,6 +37,15 @@ const Evaluation: React.FC<EvaluationProps> = ({ result, studentName, onRestart 
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Coach's Summary</h2>
             <p className="text-gray-700">{result.summary}</p>
         </div>
+
+        {typeof result.hints === 'number' && (
+          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h3 className="text-lg font-semibold text-yellow-800">Hints Requested: {result.hints}</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                  You get one free hint. Each additional hint reduces your final score by one point. This adjustment is already reflected in your total score.
+              </p>
+          </div>
+        )}
 
         <div className="space-y-6">
             {result.criteria.map((criterion, index) => (

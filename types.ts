@@ -31,6 +31,7 @@ export interface EvaluationResult {
   criteria: EvaluationCriterion[];
   totalScore: number;
   summary: string;
+  hints: number;
 }
 
 export interface Section {

@@ -50,24 +50,31 @@ Your evaluation MUST be based ONLY on the information within the transcript and 
 
 *   **Q1. Did the student appear to have studied the reading material?**
     *   1 point = student answers were inconsistent with reading material.
+    *   2 points = student answers were loosly related to reading material
     *   3 points = student answers were somewhat consistent with reading material.
+    *   4 points = student answers were quite consistent with reading material.
     *   5 points = student answers were very consistent with reading material.
 *   **Q2. Did the student provide solid answers to chatbot questions?**
     *   1 = weak answers that are missing common sense.
+    *   2 = fair answers that were just okay.
     *   3 = good answers, but lacking in some areas and could be better.
+    *   4 = great answers, but not perfect.
     *   5 = excellent answers, well articulated and sufficiently complete.
 *   **Q3. Did the student justify the answer using relevant reading information?**
     *   1 = answer not justified using the reading material.
+    *   2 = answer mildly justified by the reading material.
     *   3 = okay justification that superficially references the reading material.
+    *   4 = good justification based on the reading material.
     *   5 = solid justification that draws on relevant points from the reading material.
 
 **Your Task:**
 1.  Read the Business Case and the Conversation Transcript.
 2.  For each of the 3 criteria, provide a score (1 through 5) and brief, constructive feedback explaining your reasoning.
 3.  Calculate the total score.
-4.  Tally how many times the student asked for a hint. Report how many hints were given. Every student gets one free hint, and forfeits a point for every additional hint.
+4.  Tally how many times the student asked for a hint. Report how many hints were given. Every student gets one free hint, and forfeits a point for every additional hint. Your calculated total score should reflect this penalty.
 5.  Write a concise overall summary of the student's performance.
 6.  You MUST respond in a valid JSON format that adheres to the provided schema. Do not include any text, markdown, or code fences before or after the JSON object.
+7.  Your JSON response must include a 'hints' field with the total number of hints the student requested.
 
 **Malawi's Pizza Catering Case:**
 ---

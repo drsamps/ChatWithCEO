@@ -57,8 +57,9 @@ export const getEvaluation = async (messages: Message[], studentFirstName: strin
                     },
                     totalScore: { type: Type.NUMBER },
                     summary: { type: Type.STRING },
+                    hints: { type: Type.NUMBER },
                 },
-                required: ['criteria', 'totalScore', 'summary'],
+                required: ['criteria', 'totalScore', 'summary', 'hints'],
             },
         },
     });

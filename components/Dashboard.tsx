@@ -142,49 +142,50 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   }, [studentDetails, sortKey, sortDirection]);
 
   const SortableHeader = ({ label, sortableKey }: { label: string; sortableKey: SortKey }) => (
-    <th onClick={() => handleSort(sortableKey)} className="sortable-header">
-      <span>{label}</span>
-      {sortKey === sortableKey && (
-        <svg className={`sort-icon ${sortDirection}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.5a.75.75 0 01-1.5 0V3.75A.75.75 0 0110 3z" />
-          <path fillRule="evenodd" d="M5.75 9a.75.75 0 01.75-.75h7a.75.75 0 010 1.5h-7a.75.75 0 01-.75-.75zM10 15.5a.75.75 0 01.75.75v.01a.75.75 0 01-1.5 0V16.25a.75.75 0 01.75-.75z" transform="rotate(180 10 10)" />
-          <path d="M14.25 9.75a.75.75 0 000-1.5h-8.5a.75.75 0 000 1.5h8.5z" />
-          <path d="M10 16.25a.75.75 0 01.75-.75h.01a.75.75 0 010 1.5H10.75a.75.75 0 01-.75-.75z" />
-          <path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.75a.75.75 0 011.5 0v10.5A.75.75 0 0110 17z" />
-        </svg>
-
-      )}
+    <th
+      onClick={() => handleSort(sortableKey)}
+      className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+    >
+      <div className="flex items-center gap-2">
+        <span>{label}</span>
+        {sortKey === sortableKey && (
+          <svg className={`w-4 h-4 transition-transform ${sortDirection === 'asc' ? 'rotate-180' : ''}`} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75v10.5a.75.75 0 01-1.5 0V3.75A.75.75 0 0110 3z" clipRule="evenodd" />
+            <path fillRule="evenodd" d="M5.22 9.22a.75.75 0 011.06 0L10 12.94l3.72-3.72a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L5.22 10.28a.75.75 0 010-1.06z" clipRule="evenodd" />
+          </svg>
+        )}
+      </div>
     </th>
   );
   
   return (
-    <div className="dashboard-body">
-      <header className="dashboard-header">
-        <h1>Instructor Dashboard</h1>
-        <button onClick={onLogout} className="logout-button">
+    <div className="flex flex-col h-screen bg-gray-50 text-gray-800 font-sans">
+      <header className="flex-shrink-0 flex justify-between items-center px-6 py-3 bg-white border-b border-gray-200 shadow-sm">
+        <h1 className="text-xl font-bold text-gray-900">Instructor Dashboard</h1>
+        <button onClick={onLogout} className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-md hover:bg-gray-100">
           <span>Sign Out</span>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
           </svg>
         </button>
       </header>
-      <div className="dashboard-layout">
-        <nav className="sidebar">
-          <h2 className="sidebar-title">Course Sections</h2>
+      <div className="flex flex-1 overflow-hidden">
+        <nav className="w-80 flex-shrink-0 bg-white border-r border-gray-200 p-4 overflow-y-auto">
+          <h2 className="text-lg font-semibold text-gray-900 px-2 pb-2 mb-2 border-b">Course Sections</h2>
           {isLoadingSections ? (
-            <p>Loading sections...</p>
+            <div className="text-center p-4 text-gray-500">Loading sections...</div>
           ) : (
-            <ul className="section-list">
+            <ul className="space-y-1">
               {sectionStats.map(section => (
                 <li key={section.section_id}>
                   <button
-                    className={`section-item ${selectedSection?.section_id === section.section_id ? 'active' : ''}`}
+                    className={`w-full text-left p-3 rounded-lg transition-colors ${selectedSection?.section_id === section.section_id ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-100'}`}
                     onClick={() => handleSectionClick(section)}
                   >
-                    <div className="section-item-title">{section.section_title}</div>
-                    <div className="section-item-details">
-                      <span>{section.completions} / {section.starts} completed</span>
-                      <span className="section-item-term">{section.year_term}</span>
+                    <div className={`font-semibold ${selectedSection?.section_id === section.section_id ? 'text-blue-900' : 'text-gray-800'}`}>{section.section_title}</div>
+                    <div className="flex justify-between items-center text-sm mt-1">
+                      <span className={`${selectedSection?.section_id === section.section_id ? 'text-blue-700' : 'text-gray-500'}`}>{section.completions} / {section.starts} completed</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${selectedSection?.section_id === section.section_id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-700'}`}>{section.year_term}</span>
                     </div>
                   </button>
                 </li>
@@ -192,48 +193,50 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             </ul>
           )}
         </nav>
-        <main className="main-content">
-          {error && <p className="error-message">{error}</p>}
+        <main className="flex-1 p-6 overflow-y-auto">
+          {error && <p className="bg-red-100 border border-red-200 text-red-700 p-4 rounded-lg">{error}</p>}
           {!selectedSection ? (
-            <div className="centered-container">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 mb-4 text-gray-400">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                 </svg>
-              <p className="font-medium">Select a section from the sidebar</p>
-              <p>Choose a course section to view student performance details.</p>
+              <p className="text-lg font-medium text-gray-700">Select a section</p>
+              <p>Choose a course section from the sidebar to view student details.</p>
             </div>
           ) : (
-            <div className="card">
-              <div className="card-header">
-                <h2 className="card-title">{selectedSection.section_title}</h2>
-                <p className="card-subtitle">{selectedSection.year_term}</p>
+            <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b">
+                <h2 className="text-xl font-bold text-gray-900">{selectedSection.section_title}</h2>
+                <p className="text-sm text-gray-500">{selectedSection.year_term}</p>
               </div>
-              <div className="card-body">
+              <div>
                 {isLoadingDetails ? (
-                  <p>Loading student data...</p>
+                  <div className="p-6 text-center text-gray-500">Loading student data...</div>
                 ) : !studentDetails.length ? (
-                   <div className="centered-container" style={{minHeight: '200px'}}>No students have started the simulation for this section.</div>
+                   <div className="p-6 text-center text-gray-500">No students have started the simulation for this section yet.</div>
                 ) : (
-                  <table className="dashboard-table">
-                    <thead>
-                      <tr>
-                        <SortableHeader label="Student Name" sortableKey="full_name" />
-                        <SortableHeader label="Score" sortableKey="score" />
-                        <th>Hints</th>
-                        <SortableHeader label="Completion Time" sortableKey="finished_at" />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedStudentDetails.map(student => (
-                        <tr key={student.id}>
-                          <td className="font-medium">{student.full_name}</td>
-                          <td>{student.score !== null ? `${student.score} / 15` : <span className="text-gray-400">N/A</span>}</td>
-                          <td>{student.hints !== null ? student.hints : <span className="text-gray-400">N/A</span>}</td>
-                          <td>{student.finished_at ? new Date(student.finished_at).toLocaleString() : <span className="text-gray-500">Not Completed</span>}</td>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <SortableHeader label="Student Name" sortableKey="full_name" />
+                          <SortableHeader label="Score" sortableKey="score" />
+                          <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hints</th>
+                          <SortableHeader label="Completion Time" sortableKey="finished_at" />
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {sortedStudentDetails.map(student => (
+                          <tr key={student.id} className="hover:bg-gray-50">
+                            <td className="p-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.full_name}</td>
+                            <td className="p-4 whitespace-nowrap text-sm">{student.score !== null ? `${student.score} / 15` : <span className="text-gray-400">N/A</span>}</td>
+                            <td className="p-4 whitespace-nowrap text-sm">{student.hints !== null ? student.hints : <span className="text-gray-400">N/A</span>}</td>
+                            <td className="p-4 whitespace-nowrap text-sm">{student.finished_at ? new Date(student.finished_at).toLocaleString() : <span className="text-gray-500 font-medium">Not Completed</span>}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 )}
               </div>
             </div>

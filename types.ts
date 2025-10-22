@@ -11,6 +11,8 @@ export interface Message {
 export enum ConversationPhase {
   PRE_CHAT,
   CHATTING,
+  AWAITING_HELPFUL_PERMISSION,
+  AWAITING_HELPFUL_SCORE,
   EVALUATING,
   EVALUATION_LOADING,
 }
@@ -19,6 +21,8 @@ export enum CEOPersona {
   STRICT = 'strict',
   MODERATE = 'moderate',
   LIBERAL = 'liberal',
+  LEADING = 'leading',
+  SYCOPHANTIC = 'sycophantic',
 }
 
 export interface EvaluationCriterion {

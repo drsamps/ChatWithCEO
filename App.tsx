@@ -119,37 +119,78 @@ const App: React.FC = () => {
   }, []);
   
   const handleSendMessage = async (userMessage: string) => {
-    const lowerCaseMessage = userMessage.toLowerCase();
-    if (lowerCaseMessage.includes("time is up") || lowerCaseMessage.includes("time's up")) {
-      await handleEndConversation();
-      return;
-    }
+    if (conversationPhase === ConversationPhase.CHATTING) {
+        const lowerCaseMessage = userMessage.toLowerCase();
+        if (lowerCaseMessage.includes("time is up") || lowerCaseMessage.includes("time's up")) {
+            const finalUserMessage: Message = { role: MessageRole.USER, content: userMessage };
+            const ceoPermissionRequest: Message = {
+                role: MessageRole.MODEL,
+                content: `${studentFirstName}, thank you for meeting with me. I am glad you were able to study this case and share your insights. I hope our conversation was challenging but helpful. Would you be willing to give me a rating for my AI CEO profile?`
+            };
+            setMessages(prev => [...prev, finalUserMessage, ceoPermissionRequest]);
+            setConversationPhase(ConversationPhase.AWAITING_HELPFUL_PERMISSION);
+            return;
+        }
 
-    if (!chatSession) return;
+        if (!chatSession) return;
 
-    const newUserMessage: Message = { role: MessageRole.USER, content: userMessage };
-    setMessages((prev) => [...prev, newUserMessage]);
-    setIsLoading(true);
-    setError(null);
+        const newUserMessage: Message = { role: MessageRole.USER, content: userMessage };
+        setMessages((prev) => [...prev, newUserMessage]);
+        setIsLoading(true);
+        setError(null);
 
-    try {
-      const response = await chatSession.sendMessage({ message: userMessage });
-      const modelMessage: Message = { role: MessageRole.MODEL, content: response.text };
-      setMessages((prev) => [...prev, modelMessage]);
-    } catch (e) {
-      console.error("Failed to send message:", e);
-      setError("An error occurred while communicating with the API.");
-      const errorMessage: Message = {
-        role: MessageRole.MODEL,
-        content: "I seem to be having trouble connecting. Please try again in a moment.",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
+        try {
+            const response = await chatSession.sendMessage({ message: userMessage });
+            const modelMessage: Message = { role: MessageRole.MODEL, content: response.text };
+            setMessages((prev) => [...prev, modelMessage]);
+        } catch (e) {
+            console.error("Failed to send message:", e);
+            setError("An error occurred while communicating with the API.");
+            const errorMessage: Message = {
+                role: MessageRole.MODEL,
+                content: "I seem to be having trouble connecting. Please try again in a moment.",
+            };
+            setMessages((prev) => [...prev, errorMessage]);
+        } finally {
+            setIsLoading(false);
+        }
+    } else if (conversationPhase === ConversationPhase.AWAITING_HELPFUL_PERMISSION) {
+        const userReply: Message = { role: MessageRole.USER, content: userMessage };
+        setMessages(prev => [...prev, userReply]);
+        
+        const affirmative = ['yes', 'sure', 'ok', 'yeah', 'yep', 'absolutely', 'i would', 'of course'].some(word => userMessage.toLowerCase().includes(word));
+        
+        if (affirmative) {
+            const ceoScoreRequest: Message = {
+                role: MessageRole.MODEL,
+                content: "On a scale of 1 to 5, where 5 means most helpful, how helpful was our conversation in helping you think about case facts?"
+            };
+            setMessages(prev => [...prev, ceoScoreRequest]);
+            setConversationPhase(ConversationPhase.AWAITING_HELPFUL_SCORE);
+        } else {
+            // Student declined or gave non-committal answer, end conversation.
+            await handleEndConversation(null);
+        }
+    } else if (conversationPhase === ConversationPhase.AWAITING_HELPFUL_SCORE) {
+        const userScoreReply: Message = { role: MessageRole.USER, content: userMessage };
+        setMessages(prev => [...prev, userScoreReply]);
+        
+        // Try to extract a number (integer or float) from the user's message.
+        const numberMatch = userMessage.match(/\d(\.\d+)?/);
+        let score: number | null = null;
+        if (numberMatch && numberMatch[0]) {
+            const parsedScore = parseFloat(numberMatch[0]);
+            // Ensure the parsed number is within the valid range [1, 5].
+            if (!isNaN(parsedScore) && parsedScore >= 1 && parsedScore <= 5) {
+                score = parsedScore;
+            }
+        }
+        
+        await handleEndConversation(score);
     }
   };
 
-  const handleEndConversation = async () => {
+  const handleEndConversation = async (helpfulScore: number | null) => {
     if (!studentFirstName) return;
     setConversationPhase(ConversationPhase.EVALUATION_LOADING);
     setError(null);
@@ -168,6 +209,7 @@ const App: React.FC = () => {
             criteria: result.criteria,
             persona: ceoPersona,
             hints: result.hints,
+            helpful: helpfulScore,
           });
         if (evaluationError) console.error("Error saving evaluation:", evaluationError);
 
@@ -315,6 +357,8 @@ const App: React.FC = () => {
                     <option value={CEOPersona.MODERATE}>Moderate (Recommended)</option>
                     <option value={CEOPersona.STRICT}>Strict</option>
                     <option value={CEOPersona.LIBERAL}>Liberal</option>
+                    <option value={CEOPersona.LEADING}>Leading</option>
+                    <option value={CEOPersona.SYCOPHANTIC}>Sycophantic</option>
                 </select>
                 <p className="mt-1 text-xs text-gray-500">Determines how strictly the CEO requires you to cite case facts.</p>
             </div>

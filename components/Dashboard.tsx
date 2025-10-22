@@ -16,12 +16,14 @@ interface SectionStat {
 interface StudentDetail {
   id: string;
   full_name: string;
-  finished_at: string | null;
+  persona: string | null;
+  completion_time: string | null;
   score: number | null;
   hints: number | null;
+  helpful: number | null;
 }
 
-type SortKey = 'finished_at' | 'score' | 'full_name';
+type SortKey = 'completion_time' | 'score' | 'full_name';
 type SortDirection = 'asc' | 'desc';
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
@@ -31,7 +33,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [isLoadingSections, setIsLoadingSections] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>('finished_at');
+  const [sortKey, setSortKey] = useState<SortKey>('completion_time');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const fetchSectionStats = useCallback(async () => {
@@ -65,7 +67,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
     const stats = sections.map(section => {
       const sectionStudents = students.filter(s => s.section_id === section.section_id);
-      const completions = sectionStudents.filter(s => s.finished_at !== null).length;
+      const completions = sectionStudents.filter(s => s.finished_at).length;
       return {
         ...section,
         starts: sectionStudents.length,
@@ -81,25 +83,70 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     setIsLoadingDetails(true);
     setError(null);
     setStudentDetails([]);
-
-    const { data, error: studentError } = await supabase
+  
+    // Step 1: Fetch students for the given section.
+    const { data: studentsData, error: studentsError } = await supabase
       .from('students')
-      .select('id, full_name, finished_at, evaluations ( score, hints )')
+      .select('id, full_name, persona, finished_at')
       .eq('section_id', sectionId);
-
-    if (studentError) {
-      console.error(studentError);
-      setError('Failed to load student details. Check RLS policies.');
-    } else {
-      const formattedDetails = data.map(student => ({
+  
+    if (studentsError) {
+      console.error(studentsError);
+      setError('Failed to load students. This may be a database permission issue. Check the RLS policy on the "students" table.');
+      setIsLoadingDetails(false);
+      return;
+    }
+  
+    if (!studentsData || studentsData.length === 0) {
+      setStudentDetails([]);
+      setIsLoadingDetails(false);
+      return;
+    }
+  
+    // Step 2: Fetch evaluations for the loaded students.
+    const studentIds = studentsData.map(s => s.id);
+    const { data: evaluationsData, error: evaluationsError } = await supabase
+      .from('evaluations')
+      .select('student_id, score, hints, helpful')
+      .in('student_id', studentIds);
+  
+    if (evaluationsError) {
+      console.error("Supabase error fetching evaluations:", evaluationsError);
+      // Graceful handling: show students but indicate evaluations failed with a more specific error.
+      const detailedMessage = `Loaded students, but failed to get their evaluations. DB Error: ${evaluationsError.message}`;
+      setError(detailedMessage);
+      
+      const detailsWithoutScores = studentsData.map(student => ({
         id: student.id,
         full_name: student.full_name,
-        finished_at: student.finished_at,
-        score: student.evaluations[0]?.score ?? null,
-        hints: student.evaluations[0]?.hints ?? null,
+        persona: student.persona,
+        completion_time: student.finished_at,
+        score: null,
+        hints: null,
+        helpful: null,
       }));
-      setStudentDetails(formattedDetails);
+      setStudentDetails(detailsWithoutScores);
+      setIsLoadingDetails(false);
+      return;
     }
+    
+    // Step 3: Join the data on the client-side.
+    const evaluationsMap = new Map(evaluationsData.map(e => [e.student_id, e]));
+    
+    const combinedDetails = studentsData.map(student => {
+      const evaluation = evaluationsMap.get(student.id);
+      return {
+        id: student.id,
+        full_name: student.full_name,
+        persona: student.persona,
+        completion_time: student.finished_at,
+        score: evaluation?.score ?? null,
+        hints: evaluation?.hints ?? null,
+        helpful: evaluation?.helpful ?? null,
+      };
+    });
+  
+    setStudentDetails(combinedDetails);
     setIsLoadingDetails(false);
   }, []);
 
@@ -115,7 +162,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
   const handleSectionClick = (section: SectionStat) => {
     setSelectedSection(section);
-    setSortKey('finished_at');
+    setSortKey('completion_time');
     setSortDirection('desc');
   };
 
@@ -171,8 +218,20 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       </header>
       <div className="flex flex-1 overflow-hidden">
         <nav className="w-80 flex-shrink-0 bg-white border-r border-gray-200 p-4 overflow-y-auto">
-          <h2 className="text-lg font-semibold text-gray-900 px-2 pb-2 mb-2 border-b">Course Sections</h2>
-          {isLoadingSections ? (
+          <div className="flex justify-between items-center px-2 pb-2 mb-2 border-b">
+            <h2 className="text-lg font-semibold text-gray-900">Course Sections</h2>
+            <button
+                onClick={() => fetchSectionStats()}
+                disabled={isLoadingSections}
+                className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-md disabled:opacity-50"
+                aria-label="Refresh sections"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 ${isLoadingSections ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 110 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm-1 9a1 1 0 011-1h5a1 1 0 110 2H5a1 1 0 01-1-1zm11-1a1 1 0 100 2h-5a1 1 0 100-2h5z" clipRule="evenodd" />
+                </svg>
+            </button>
+          </div>
+          {isLoadingSections && !sectionStats.length ? (
             <div className="text-center p-4 text-gray-500">Loading sections...</div>
           ) : (
             <ul className="space-y-1">
@@ -194,7 +253,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           )}
         </nav>
         <main className="flex-1 p-6 overflow-y-auto">
-          {error && <p className="bg-red-100 border border-red-200 text-red-700 p-4 rounded-lg">{error}</p>}
           {!selectedSection ? (
             <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-12 h-12 mb-4 text-gray-400">
@@ -204,42 +262,49 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
               <p>Choose a course section from the sidebar to view student details.</p>
             </div>
           ) : (
-            <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-              <div className="p-4 border-b">
-                <h2 className="text-xl font-bold text-gray-900">{selectedSection.section_title}</h2>
-                <p className="text-sm text-gray-500">{selectedSection.year_term}</p>
-              </div>
-              <div>
-                {isLoadingDetails ? (
-                  <div className="p-6 text-center text-gray-500">Loading student data...</div>
-                ) : !studentDetails.length ? (
-                   <div className="p-6 text-center text-gray-500">No students have started the simulation for this section yet.</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <SortableHeader label="Student Name" sortableKey="full_name" />
-                          <SortableHeader label="Score" sortableKey="score" />
-                          <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hints</th>
-                          <SortableHeader label="Completion Time" sortableKey="finished_at" />
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {sortedStudentDetails.map(student => (
-                          <tr key={student.id} className="hover:bg-gray-50">
-                            <td className="p-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.full_name}</td>
-                            <td className="p-4 whitespace-nowrap text-sm">{student.score !== null ? `${student.score} / 15` : <span className="text-gray-400">N/A</span>}</td>
-                            <td className="p-4 whitespace-nowrap text-sm">{student.hints !== null ? student.hints : <span className="text-gray-400">N/A</span>}</td>
-                            <td className="p-4 whitespace-nowrap text-sm">{student.finished_at ? new Date(student.finished_at).toLocaleString() : <span className="text-gray-500 font-medium">Not Completed</span>}</td>
+            <>
+              {error && <p className="mb-4 bg-red-100 border border-red-200 text-red-700 p-4 rounded-lg">{error}</p>}
+              <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+                <div className="p-4 border-b">
+                  <h2 className="text-xl font-bold text-gray-900">{selectedSection.section_title}</h2>
+                  <p className="text-sm text-gray-500">{selectedSection.year_term}</p>
+                </div>
+                <div>
+                  {isLoadingDetails ? (
+                    <div className="p-6 text-center text-gray-500">Loading student data...</div>
+                  ) : !studentDetails.length ? (
+                    <div className="p-6 text-center text-gray-500">No students have started the simulation for this section yet.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <SortableHeader label="Student Name" sortableKey="full_name" />
+                            <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CEO Persona</th>
+                            <SortableHeader label="Score" sortableKey="score" />
+                            <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hints</th>
+                            <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Helpful</th>
+                            <SortableHeader label="Completion Time" sortableKey="completion_time" />
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {sortedStudentDetails.map(student => (
+                            <tr key={student.id} className="hover:bg-gray-50">
+                              <td className="p-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.full_name}</td>
+                              <td className="p-4 whitespace-nowrap text-sm text-gray-600">{student.persona ? student.persona.charAt(0).toUpperCase() + student.persona.slice(1) : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm">{student.score !== null ? `${student.score} / 15` : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm">{student.hints !== null ? student.hints : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm">{student.helpful !== null ? `${student.helpful.toFixed(1)} / 5` : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm">{student.completion_time ? new Date(student.completion_time).toLocaleString() : <span className="text-gray-500 font-medium">Not Completed</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           )}
         </main>
       </div>

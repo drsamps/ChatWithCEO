@@ -37,12 +37,14 @@ const App: React.FC = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    // Basic routing and session check
-    const checkSession = async () => {
+    // Handles client-side routing and auth state
+    const handleRouteChange = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         const urlParams = new URLSearchParams(window.location.search);
         
-        if (window.location.pathname.startsWith('/admin') || urlParams.get('view') === 'admin') {
+        // Use hash-based routing for robust SPA navigation.
+        // Fallback to query param for AI Studio Preview compatibility.
+        if (window.location.hash === '#/admin' || urlParams.get('view') === 'admin') {
             setView('admin');
             setIsAdminAuthenticated(!!session);
         } else {
@@ -50,7 +52,17 @@ const App: React.FC = () => {
         }
         setIsReady(true);
     };
-    checkSession();
+    
+    // Initial check on page load
+    handleRouteChange();
+
+    // Listen for hash changes to handle navigation (e.g., back/forward buttons)
+    window.addEventListener('hashchange', handleRouteChange);
+    
+    // Cleanup listener on component unmount
+    return () => {
+      window.removeEventListener('hashchange', handleRouteChange);
+    };
   }, []);
   
   useEffect(() => {
@@ -245,6 +257,8 @@ const App: React.FC = () => {
   const handleAdminLogout = async () => {
     await supabase.auth.signOut();
     setIsAdminAuthenticated(false);
+    // Redirect to student view after logout
+    window.location.hash = '';
   };
 
   if (!isReady) {

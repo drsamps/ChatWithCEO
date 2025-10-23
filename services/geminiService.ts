@@ -14,12 +14,12 @@ const getAI = (): GoogleGenAI => {
     return ai;
 }
 
-export const createChatSession = (studentName: string, persona: CEOPersona): Chat => {
+export const createChatSession = (studentName: string, persona: CEOPersona, modelId: string): Chat => {
     const genAI = getAI();
     const systemInstruction = getSystemPrompt(studentName, persona);
     
     const chat = genAI.chats.create({
-        model: 'gemini-2.5-pro',
+        model: modelId,
         config: {
             systemInstruction: systemInstruction,
             temperature: 0.7,
@@ -30,13 +30,13 @@ export const createChatSession = (studentName: string, persona: CEOPersona): Cha
     return chat;
 };
 
-export const getEvaluation = async (messages: Message[], studentFirstName: string, studentFullName: string): Promise<EvaluationResult> => {
+export const getEvaluation = async (messages: Message[], studentFirstName: string, studentFullName: string, modelId: string): Promise<EvaluationResult> => {
     const genAI = getAI();
     const chatHistory = messages.map(msg => `${msg.role === 'user' ? studentFirstName : 'CEO'}: ${msg.content}`).join('\n\n');
     const prompt = getCoachPrompt(chatHistory, studentFullName);
 
     const response = await genAI.models.generateContent({
-        model: 'gemini-2.5-pro',
+        model: modelId,
         contents: prompt,
         config: {
             responseMimeType: "application/json",

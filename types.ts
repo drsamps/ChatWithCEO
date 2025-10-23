@@ -45,4 +45,6 @@ export interface Section {
     section_id: string;
     section_title: string;
     year_term: string;
+    chat_model: string | null;
+    super_model: string | null;
 }

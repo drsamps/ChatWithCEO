@@ -5,22 +5,24 @@ interface EvaluationProps {
   result: EvaluationResult | null;
   studentName: string;
   onRestart: () => void;
+  superModelName: string | null;
 }
 
-const LoadingSpinner: React.FC = () => (
-    <div className="flex flex-col items-center justify-center gap-4">
+const LoadingSpinner: React.FC<{ modelName: string | null }> = ({ modelName }) => (
+    <div className="flex flex-col items-center justify-center text-center p-4">
         <div className="w-16 h-16 border-4 border-blue-500 border-dashed rounded-full animate-spin"></div>
-        <p className="text-xl font-semibold text-gray-700">The AI Supervisor is reviewing your conversation to provide feedback...</p>
-        <p className="text-gray-500">This may take a moment.</p>
+        <p className="mt-4 text-xl font-semibold text-gray-700">The AI Supervisor is reviewing your conversation to provide feedback...</p>
+        <p className="mt-2 text-gray-500">This may take a moment.</p>
+        {modelName && <p className="mt-8 text-xs text-gray-400">Using supervisor model: {modelName}</p>}
     </div>
 );
 
 // FIX: Correctly type the component's props using React.FC<EvaluationProps> to resolve type errors.
-const Evaluation: React.FC<EvaluationProps> = ({ result, studentName, onRestart }) => {
+const Evaluation: React.FC<EvaluationProps> = ({ result, studentName, onRestart, superModelName }) => {
   if (!result) {
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-200">
-            <LoadingSpinner />
+            <LoadingSpinner modelName={superModelName} />
         </div>
     );
   }

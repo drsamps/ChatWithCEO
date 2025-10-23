@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useEffect } from 'react';
 import { Message, MessageRole, CEOPersona } from '../types';
 
@@ -6,6 +7,7 @@ interface ChatWindowProps {
   messages: Message[];
   isLoading: boolean;
   ceoPersona: CEOPersona;
+  chatModelName: string | null;
 }
 
 const renderMessageContent = (content: string) => {
@@ -18,7 +20,7 @@ const renderMessageContent = (content: string) => {
   });
 };
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona, chatModelName }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -29,7 +31,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona
     scrollToBottom();
   }, [messages, isLoading]);
 
-  const ceoTitle = `Kent Beck, ${ceoPersona.charAt(0).toUpperCase() + ceoPersona.slice(1)} CEO of Malawi's Pizza`;
+  const personaName = ceoPersona.charAt(0).toUpperCase() + ceoPersona.slice(1);
+  const ceoTitle = `Kent Beck, ${personaName} CEO of Malawi's Pizza (AI model: ${chatModelName || '...'})`;
+
 
   return (
     <div className="flex-1 p-6 space-y-6 overflow-y-auto">

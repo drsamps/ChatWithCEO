@@ -12,6 +12,11 @@ import Evaluation from './components/Evaluation';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 
+interface Model {
+    model_id: string;
+    model_name: string;
+}
+
 const App: React.FC = () => {
   // Common state
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -39,6 +44,11 @@ const App: React.FC = () => {
   const [likedFeedback, setLikedFeedback] = useState<string | null>(null);
   const [improveFeedback, setImproveFeedback] = useState<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [models, setModels] = useState<Model[]>([]);
+  const [defaultModel, setDefaultModel] = useState<string | null>(null);
+  const [selectedChatModel, setSelectedChatModel] = useState<string | null>(null);
+  const [selectedSuperModel, setSelectedSuperModel] = useState<string | null>(null);
+
 
   useEffect(() => {
     // Handles client-side routing and auth state
@@ -81,7 +91,7 @@ const App: React.FC = () => {
     const fetchSections = async () => {
         const { data, error: fetchError } = await supabase
             .from('sections')
-            .select('section_id, section_title, year_term')
+            .select('section_id, section_title, year_term, chat_model, super_model')
             .eq('enabled', true)
             .order('year_term', { ascending: false })
             .order('section_title', { ascending: true });
@@ -90,14 +100,42 @@ const App: React.FC = () => {
             console.error('Error fetching sections:', fetchError);
             setError('Could not load course sections from the database.');
         } else {
-            setSections(data);
+            setSections(data as Section[]);
             if (data.length === 0) {
                 setSelectedSection('other');
             }
         }
     };
+    
+    const fetchModels = async () => {
+        const { data, error: modelError } = await supabase
+            .from('models')
+            .select('model_id, model_name, default')
+            .eq('enabled', true);
+        
+        if (modelError) {
+            console.error('Error fetching models:', modelError);
+            setError('Could not load AI models from the database.');
+        } else {
+            setModels(data);
+            const defaultM = data.find(m => m.default);
+            let initialModelId = null;
+            if (defaultM) {
+                initialModelId = defaultM.model_id;
+            } else if (data.length > 0) {
+                initialModelId = data[0].model_id;
+            }
+            
+            if (initialModelId) {
+                setDefaultModel(initialModelId);
+                setSelectedChatModel(initialModelId);
+                setSelectedSuperModel(initialModelId);
+            }
+        }
+    };
 
     if (view === 'student' && conversationPhase === ConversationPhase.PRE_CHAT) {
+        fetchModels();
         fetchSections();
     }
   }, [conversationPhase, view]);
@@ -113,11 +151,11 @@ const App: React.FC = () => {
     }
   }, [messages, isLoading, conversationPhase]);
 
-  const startConversation = useCallback(async (name: string, persona: CEOPersona) => {
+  const startConversation = useCallback(async (name: string, persona: CEOPersona, modelId: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const session = createChatSession(name, persona);
+      const session = createChatSession(name, persona, modelId);
       setChatSession(session);
       const firstMessage = `Hello ${name}, I am Kent Beck, the CEO of Malawi's Pizza. Thank you for meeting with me today. Our time is limited so let's get straight to my quandary: **Should we stay in the catering business, or is pizza catering a distraction from our core restaurant operations?**`;
       setMessages([{ role: MessageRole.MODEL, content: firstMessage }]);
@@ -233,12 +271,12 @@ const App: React.FC = () => {
   };
 
   const handleProceedToEvaluation = async () => {
-    if (!studentFirstName) return;
+    if (!studentFirstName || !selectedSuperModel) return;
     setConversationPhase(ConversationPhase.EVALUATION_LOADING);
     setError(null);
     try {
       const fullName = `${tempFirstName.trim()} ${tempLastName.trim()}`;
-      const result = await getEvaluation(messages, studentFirstName, fullName);
+      const result = await getEvaluation(messages, studentFirstName, fullName, selectedSuperModel);
       setEvaluationResult(result);
       
       if (studentDBId) {
@@ -258,6 +296,8 @@ const App: React.FC = () => {
             helpful: helpfulScore,
             liked: sanitizedLiked,
             improve: sanitizedImprove,
+            chat_model: selectedChatModel,
+            super_model: selectedSuperModel,
           })
           .select('created_at')
           .single();
@@ -285,7 +325,7 @@ const App: React.FC = () => {
 
   const handleNameSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tempFirstName.trim() || !tempLastName.trim()) return;
+    if (!tempFirstName.trim() || !tempLastName.trim() || !selectedChatModel) return;
     
     // Prompt Injection Prevention: Validate names for allowed characters.
     const nameRegex = /^[\p{L}\s'-]+$/u;
@@ -338,7 +378,7 @@ const App: React.FC = () => {
     
     setStudentDBId(data.id);
     setStudentFirstName(trimmedFirstName);
-    await startConversation(trimmedFirstName, ceoPersona);
+    await startConversation(trimmedFirstName, ceoPersona, selectedChatModel);
     setIsLoading(false);
   };
 
@@ -359,6 +399,24 @@ const App: React.FC = () => {
     setHelpfulScore(null);
     setLikedFeedback(null);
     setImproveFeedback(null);
+    setSelectedChatModel(defaultModel);
+    setSelectedSuperModel(defaultModel);
+  };
+
+  const handleSectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const sectionId = e.target.value;
+      setSelectedSection(sectionId);
+
+      if (sectionId === 'other' || !sectionId) {
+          setSelectedChatModel(defaultModel);
+          setSelectedSuperModel(defaultModel);
+      } else {
+          const section = sections.find(s => s.section_id === sectionId);
+          if (section) {
+              setSelectedChatModel(section.chat_model || defaultModel);
+              setSelectedSuperModel(section.super_model || defaultModel);
+          }
+      }
   };
 
   const handleAdminLogin = () => setIsAdminAuthenticated(true);
@@ -401,7 +459,7 @@ const App: React.FC = () => {
             >
               Chat with the CEO
             </h1>
-            <p className="mt-2 text-gray-600">You will have a brief opportunity to chat with the (AI simulated) CEO about the case. Enter your name and choose a persona to begin.</p>
+            <p className="mt-2 text-gray-600">You will have a brief opportunity to chat with the (AI simulated) CEO about the case. Enter your name and course section and choose a CEO persona to begin.</p>
           </div>
           <form onSubmit={handleNameSubmit} className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-4">
@@ -416,7 +474,7 @@ const App: React.FC = () => {
             </div>
             <div>
               <label htmlFor="section" className="block text-sm font-medium text-gray-700">What course section are you in?</label>
-              <select id="section" value={selectedSection} onChange={(e) => setSelectedSection(e.target.value)} className="w-full px-4 py-2 mt-1 text-gray-900 bg-gray-100 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+              <select id="section" value={selectedSection} onChange={handleSectionChange} className="w-full px-4 py-2 mt-1 text-gray-900 bg-gray-100 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 <option value="" disabled>Click to select...</option>
                 {sections.map((sec) => (<option key={sec.section_id} value={sec.section_id}>{sec.section_title} ({sec.year_term})</option>))}
                 <option value="other">Other...</option>
@@ -430,6 +488,7 @@ const App: React.FC = () => {
             )}
              <div>
                 <label htmlFor="ceoPersona" className="block text-sm font-medium text-gray-700">CEO Personality</label>
+                <p className="mt-1 text-xs text-gray-500">Determines how strictly the CEO requires you to cite case facts.</p>
                 <select id="ceoPersona" value={ceoPersona} onChange={(e) => setCeoPersona(e.target.value as CEOPersona)} className="w-full px-4 py-2 mt-1 text-gray-900 bg-gray-100 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     <option value={CEOPersona.MODERATE}>Moderate (Recommended)</option>
                     <option value={CEOPersona.STRICT}>Strict</option>
@@ -437,7 +496,6 @@ const App: React.FC = () => {
                     <option value={CEOPersona.LEADING}>Leading</option>
                     <option value={CEOPersona.SYCOPHANTIC}>Sycophantic</option>
                 </select>
-                <p className="mt-1 text-xs text-gray-500">Determines how strictly the CEO requires you to cite case facts.</p>
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button type="submit" disabled={isLoading || !tempFirstName.trim() || !tempLastName.trim() || !isSectionValid} className="w-full px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400">
@@ -449,8 +507,11 @@ const App: React.FC = () => {
     );
   }
 
+  const chatModelName = models.find(m => m.model_id === selectedChatModel)?.model_name || selectedChatModel;
+  const superModelName = models.find(m => m.model_id === selectedSuperModel)?.model_name || selectedSuperModel;
+
   if (conversationPhase === ConversationPhase.EVALUATION_LOADING || conversationPhase === ConversationPhase.EVALUATING) {
-    return <Evaluation result={evaluationResult} studentName={`${tempFirstName.trim()} ${tempLastName.trim()}` || 'Student'} onRestart={handleRestart} />;
+    return <Evaluation result={evaluationResult} studentName={`${tempFirstName.trim()} ${tempLastName.trim()}` || 'Student'} onRestart={handleRestart} superModelName={superModelName} />;
   }
 
   return (
@@ -460,7 +521,7 @@ const App: React.FC = () => {
       </main>
       <aside className="lg:w-2/3 xl:w-3/4 h-1/2 lg:h-full flex flex-col bg-gray-200 rounded-xl shadow-lg">
         {error && <div className="p-4 bg-red-500 text-white text-center font-semibold rounded-t-xl">{error}</div>}
-        <ChatWindow messages={messages} isLoading={isLoading} ceoPersona={ceoPersona} />
+        <ChatWindow messages={messages} isLoading={isLoading} ceoPersona={ceoPersona} chatModelName={chatModelName} />
         {conversationPhase === ConversationPhase.FEEDBACK_COMPLETE ? (
             <div className="p-4 bg-white border-t border-gray-200 flex justify-center items-center">
                 <button

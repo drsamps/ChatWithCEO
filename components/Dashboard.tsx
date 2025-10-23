@@ -13,6 +13,8 @@ interface SectionStat {
   year_term: string;
   starts: number;
   completions: number;
+  chat_model: string | null;
+  super_model: string | null;
 }
 
 interface StudentDetail {
@@ -23,15 +25,18 @@ interface StudentDetail {
   score: number | null;
   hints: number | null;
   helpful: number | null;
+  chat_model: string | null;
+  super_model: string | null;
 }
 
-type SortKey = 'full_name' | 'persona' | 'score' | 'hints' | 'helpful' | 'completion_time';
+type SortKey = 'full_name' | 'persona' | 'score' | 'hints' | 'helpful' | 'completion_time' | 'chat_model' | 'super_model';
 type SortDirection = 'asc' | 'desc';
 
 const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [sectionStats, setSectionStats] = useState<SectionStat[]>([]);
   const [selectedSection, setSelectedSection] = useState<SectionStat | null>(null);
   const [studentDetails, setStudentDetails] = useState<StudentDetail[]>([]);
+  const [modelsMap, setModelsMap] = useState<Map<string, string>>(new Map());
   const [isLoadingSections, setIsLoadingSections] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,13 +44,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [showOnlyCompleted, setShowOnlyCompleted] = useState(false);
 
+  useEffect(() => {
+    const fetchModels = async () => {
+        const { data, error } = await supabase
+            .from('models')
+            .select('model_id, model_name');
+        
+        if (error) {
+            console.error('Failed to fetch models', error);
+        } else {
+            setModelsMap(new Map(data.map(m => [m.model_id, m.model_name])));
+        }
+    };
+    fetchModels();
+  }, []);
+
   const fetchSectionStats = useCallback(async () => {
     setIsLoadingSections(true);
     setError(null);
 
     const { data: sections, error: sectionsError } = await supabase
       .from('sections')
-      .select('section_id, section_title, year_term')
+      .select('section_id, section_title, year_term, chat_model, super_model')
       .eq('enabled', true)
       .order('year_term', { ascending: false })
       .order('section_title', { ascending: true });
@@ -102,6 +122,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             year_term: 'unassigned',
             starts: unassignedStudents.length,
             completions: unassignedCompletions,
+            chat_model: null,
+            super_model: null,
         };
         stats.unshift(unassignedSectionStat);
     }
@@ -173,7 +195,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     const studentIds = studentsData.map(s => s.id);
     const { data: evaluationsData, error: evaluationsError } = await supabase
       .from('evaluations')
-      .select('student_id, score, hints, helpful, created_at')
+      .select('student_id, score, hints, helpful, created_at, chat_model, super_model')
       .in('student_id', studentIds);
   
     if (evaluationsError) {
@@ -190,6 +212,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         score: null,
         hints: null,
         helpful: null,
+        chat_model: null,
+        super_model: null,
       }));
       setStudentDetails(detailsWithoutScores);
       setIsLoadingDetails(false);
@@ -209,6 +233,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         score: evaluation?.score ?? null,
         hints: evaluation?.hints ?? null,
         helpful: evaluation?.helpful ?? null,
+        chat_model: evaluation?.chat_model ?? null,
+        super_model: evaluation?.super_model ?? null,
       };
     });
   
@@ -289,12 +315,24 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             (to Supabase)
           </a>
         </div>
-        <button onClick={onLogout} className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-md hover:bg-gray-100">
-          <span>Sign Out</span>
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-4">
+          <a
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              window.location.hash = '';
+            }}
+            className="text-sm font-medium text-gray-600 hover:text-gray-900 p-2 rounded-md hover:bg-gray-100 transition-colors"
+          >
+            to CEO chatbot
+          </a>
+          <button onClick={onLogout} className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-md hover:bg-gray-100">
+            <span>Sign Out</span>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+            </svg>
+          </button>
+        </div>
       </header>
       <div className="flex flex-1 overflow-hidden">
         <nav className="w-80 flex-shrink-0 bg-white border-r border-gray-200 p-4 overflow-y-auto">
@@ -325,6 +363,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                     <div className="flex justify-between items-center text-sm mt-1">
                       <span className={`${selectedSection?.section_id === section.section_id ? 'text-blue-700' : 'text-gray-500'}`}>{section.completions} / {section.starts} completed</span>
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${selectedSection?.section_id === section.section_id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-700'}`}>{section.year_term}</span>
+                    </div>
+                     <div className="text-xs mt-2 text-gray-500">
+                        {section.chat_model && (<div>Chat: {modelsMap.get(section.chat_model) || section.chat_model}</div>)}
+                        {section.super_model && (<div>Super: {modelsMap.get(section.super_model) || section.super_model}</div>)}
                     </div>
                   </button>
                 </li>
@@ -380,6 +422,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                             <SortableHeader label="Score" sortableKey="score" />
                             <SortableHeader label="Hints" sortableKey="hints" />
                             <SortableHeader label="Helpful" sortableKey="helpful" />
+                            <SortableHeader label="Chat Model" sortableKey="chat_model" />
+                            <SortableHeader label="Super Model" sortableKey="super_model" />
                             <SortableHeader label="Completion Time" sortableKey="completion_time" />
                           </tr>
                         </thead>
@@ -391,6 +435,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                               <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.score !== null ? `${student.score} / 15` : <span className="text-gray-400">N/A</span>}</td>
                               <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.hints !== null ? student.hints : <span className="text-gray-400">N/A</span>}</td>
                               <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.helpful !== null ? `${student.helpful.toFixed(1)} / 5` : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm text-gray-500">{student.chat_model ? (modelsMap.get(student.chat_model) || student.chat_model) : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm text-gray-500">{student.super_model ? (modelsMap.get(student.super_model) || student.super_model) : <span className="text-gray-400">N/A</span>}</td>
                               <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.completion_time ? new Date(student.completion_time).toLocaleString() : <span className="text-gray-500 font-medium">Not Completed</span>}</td>
                             </tr>
                           ))}

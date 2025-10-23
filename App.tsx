@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import type { Chat } from '@google/genai';
 import { Message, MessageRole, ConversationPhase, EvaluationResult, CEOPersona, Section } from './types';
@@ -242,9 +243,10 @@ const App: React.FC = () => {
       
       if (studentDBId) {
         const sanitizedLiked = sanitizeFeedback(likedFeedback);
+        // FIX: Corrected function call from `sanitize feedback` to `sanitizeFeedback`.
         const sanitizedImprove = sanitizeFeedback(improveFeedback);
 
-        const { error: evaluationError } = await supabase
+        const { data: evaluationData, error: evaluationError } = await supabase
           .from('evaluations')
           .insert({
             student_id: studentDBId,
@@ -256,14 +258,22 @@ const App: React.FC = () => {
             helpful: helpfulScore,
             liked: sanitizedLiked,
             improve: sanitizedImprove,
-          });
-        if (evaluationError) console.error("Error saving evaluation:", evaluationError);
+          })
+          .select('created_at')
+          .single();
 
-        const { error: studentUpdateError } = await supabase
-          .from('students')
-          .update({ finished_at: new Date().toISOString() })
-          .eq('id', studentDBId);
-        if (studentUpdateError) console.error("Error updating student finished_at timestamp:", studentUpdateError);
+        if (evaluationError) {
+          console.error("Error saving evaluation:", evaluationError);
+        } else if (evaluationData) {
+          // If evaluation is saved, try to update the student's finished_at timestamp
+          // using the timestamp from the evaluation record for consistency.
+          const { error: studentUpdateError } = await supabase
+            .from('students')
+            .update({ finished_at: evaluationData.created_at })
+            .eq('id', studentDBId)
+            .select();
+          if (studentUpdateError) console.error("Error updating student finished_at timestamp:", studentUpdateError);
+        }
       }
       setConversationPhase(ConversationPhase.EVALUATING);
     } catch (e) {
@@ -391,7 +401,7 @@ const App: React.FC = () => {
             >
               Chat with the CEO
             </h1>
-            <p className="mt-2 text-gray-600">You will have a brief opportunity to chat with the (simulated) CEO about the case. Enter your name and choose a persona to begin.</p>
+            <p className="mt-2 text-gray-600">You will have a brief opportunity to chat with the (AI simulated) CEO about the case. Enter your name and choose a persona to begin.</p>
           </div>
           <form onSubmit={handleNameSubmit} className="space-y-6">
             <div className="flex flex-col sm:flex-row gap-4">

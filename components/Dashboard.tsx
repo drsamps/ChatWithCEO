@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabaseClient';
 
@@ -35,6 +37,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('completion_time');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [showOnlyCompleted, setShowOnlyCompleted] = useState(false);
 
   const fetchSectionStats = useCallback(async () => {
     setIsLoadingSections(true);
@@ -56,7 +59,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
 
     const { data: students, error: studentsError } = await supabase
       .from('students')
-      .select('section_id, finished_at');
+      .select('id, section_id');
 
     if (studentsError) {
       console.error(studentsError);
@@ -65,15 +68,43 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       return;
     }
 
-    const stats = sections.map(section => {
+    const { data: evaluations, error: evaluationsError } = await supabase
+        .from('evaluations')
+        .select('student_id');
+
+    if (evaluationsError) {
+        console.error(evaluationsError);
+        setError('Failed to fetch evaluation data. Check RLS policies.');
+        setIsLoadingSections(false);
+        return;
+    }
+    
+    const completedStudentIds = new Set(evaluations.map(e => e.student_id));
+
+    const stats: SectionStat[] = sections.map(section => {
       const sectionStudents = students.filter(s => s.section_id === section.section_id);
-      const completions = sectionStudents.filter(s => s.finished_at).length;
+      const completions = sectionStudents.filter(s => completedStudentIds.has(s.id)).length;
       return {
         ...section,
         starts: sectionStudents.length,
         completions: completions,
       };
     });
+
+    const assignedStudentSectionIds = new Set(sections.map(s => s.section_id));
+    const unassignedStudents = students.filter(s => !s.section_id || !assignedStudentSectionIds.has(s.section_id));
+
+    if (unassignedStudents.length > 0) {
+        const unassignedCompletions = unassignedStudents.filter(s => completedStudentIds.has(s.id)).length;
+        const unassignedSectionStat: SectionStat = {
+            section_id: 'unassigned',
+            section_title: 'Not in a course',
+            year_term: 'unassigned',
+            starts: unassignedStudents.length,
+            completions: unassignedCompletions,
+        };
+        stats.unshift(unassignedSectionStat);
+    }
 
     setSectionStats(stats);
     setIsLoadingSections(false);
@@ -85,10 +116,45 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     setStudentDetails([]);
   
     // Step 1: Fetch students for the given section.
-    const { data: studentsData, error: studentsError } = await supabase
-      .from('students')
-      .select('id, full_name, persona, finished_at')
-      .eq('section_id', sectionId);
+    // FIX: A type error was resolved by declaring the types for `studentsData` and `studentsError`
+    // before they are conditionally assigned within the `if`/`else` blocks.
+    let studentsData: { id: string, full_name: string, persona: string | null, finished_at: string | null, section_id: string | null }[] | null = null;
+    let studentsError: any = null;
+
+    if (sectionId === 'unassigned') {
+        const { data: allStudents, error: allStudentsError } = await supabase
+            .from('students')
+            // FIX: Add section_id to the select statement to allow filtering on it.
+            .select('id, full_name, persona, finished_at, section_id');
+        
+        if (allStudentsError) {
+            studentsData = null;
+            studentsError = allStudentsError;
+        } else {
+            const { data: sections, error: sectionsError } = await supabase
+                .from('sections')
+                .select('section_id')
+                .eq('enabled', true);
+            
+            if (sectionsError) {
+                setError('Failed to get sections to filter unassigned students.');
+                setIsLoadingDetails(false);
+                return;
+            }
+
+            const assignedSectionIds = new Set(sections.map(s => s.section_id));
+            studentsData = allStudents.filter(s => !s.section_id || !assignedSectionIds.has(s.section_id));
+            studentsError = null;
+        }
+    } else {
+        const { data, error } = await supabase
+            .from('students')
+            // FIX: Add section_id to maintain type consistency for studentsData.
+            .select('id, full_name, persona, finished_at, section_id')
+            .eq('section_id', sectionId);
+        studentsData = data;
+        studentsError = error;
+    }
   
     if (studentsError) {
       console.error(studentsError);
@@ -107,7 +173,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     const studentIds = studentsData.map(s => s.id);
     const { data: evaluationsData, error: evaluationsError } = await supabase
       .from('evaluations')
-      .select('student_id, score, hints, helpful')
+      .select('student_id, score, hints, helpful, created_at')
       .in('student_id', studentIds);
   
     if (evaluationsError) {
@@ -139,7 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
         id: student.id,
         full_name: student.full_name,
         persona: student.persona,
-        completion_time: student.finished_at,
+        completion_time: evaluation?.created_at ?? student.finished_at,
         score: evaluation?.score ?? null,
         hints: evaluation?.hints ?? null,
         helpful: evaluation?.helpful ?? null,
@@ -176,7 +242,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   };
 
   const sortedStudentDetails = useMemo(() => {
-    return [...studentDetails].sort((a, b) => {
+    const filteredDetails = showOnlyCompleted
+      ? studentDetails.filter(student => student.completion_time !== null)
+      : studentDetails;
+
+    return [...filteredDetails].sort((a, b) => {
       const valA = a[sortKey];
       const valB = b[sortKey];
 
@@ -186,7 +256,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       if (valA > valB) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [studentDetails, sortKey, sortDirection]);
+  }, [studentDetails, sortKey, sortDirection, showOnlyCompleted]);
 
   const SortableHeader = ({ label, sortableKey }: { label: string; sortableKey: SortKey }) => (
     <th
@@ -275,15 +345,31 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             <>
               {error && <p className="mb-4 bg-red-100 border border-red-200 text-red-700 p-4 rounded-lg">{error}</p>}
               <div className="bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
-                <div className="p-4 border-b">
-                  <h2 className="text-xl font-bold text-gray-900">{selectedSection.section_title}</h2>
-                  <p className="text-sm text-gray-500">{selectedSection.year_term}</p>
+                <div className="p-4 border-b flex justify-between items-center">
+                    <div>
+                        <h2 className="text-xl font-bold text-gray-900">{selectedSection.section_title}</h2>
+                        <p className="text-sm text-gray-500">{selectedSection.year_term}</p>
+                    </div>
+                    <div className="flex items-center">
+                        <input
+                            type="checkbox"
+                            id="showOnlyCompleted"
+                            checked={showOnlyCompleted}
+                            onChange={(e) => setShowOnlyCompleted(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <label htmlFor="showOnlyCompleted" className="ml-2 block text-sm font-medium text-gray-900 cursor-pointer">
+                            Only show completed
+                        </label>
+                    </div>
                 </div>
                 <div>
                   {isLoadingDetails ? (
                     <div className="p-6 text-center text-gray-500">Loading student data...</div>
                   ) : !studentDetails.length ? (
                     <div className="p-6 text-center text-gray-500">No students have started the simulation for this section yet.</div>
+                  ) : !sortedStudentDetails.length ? (
+                    <div className="p-6 text-center text-gray-500">No completed students to display.</div>
                   ) : (
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200">
@@ -301,11 +387,11 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                           {sortedStudentDetails.map(student => (
                             <tr key={student.id} className="hover:bg-gray-50">
                               <td className="p-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.full_name}</td>
-                              <td className="p-4 whitespace-nowrap text-sm text-gray-600">{student.persona ? student.persona.charAt(0).toUpperCase() + student.persona.slice(1) : <span className="text-gray-400">N/A</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.persona ? student.persona.charAt(0).toUpperCase() + student.persona.slice(1) : <span className="text-gray-400">N/A</span>}</td>
                               <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.score !== null ? `${student.score} / 15` : <span className="text-gray-400">N/A</span>}</td>
                               <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.hints !== null ? student.hints : <span className="text-gray-400">N/A</span>}</td>
                               <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.helpful !== null ? `${student.helpful.toFixed(1)} / 5` : <span className="text-gray-400">N/A</span>}</td>
-                              <td className="p-4 whitespace-nowrap text-sm">{student.completion_time ? new Date(student.completion_time).toLocaleString() : <span className="text-gray-500 font-medium">Not Completed</span>}</td>
+                              <td className="p-4 whitespace-nowrap text-sm text-gray-900">{student.completion_time ? new Date(student.completion_time).toLocaleString() : <span className="text-gray-500 font-medium">Not Completed</span>}</td>
                             </tr>
                           ))}
                         </tbody>

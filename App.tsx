@@ -11,11 +11,37 @@ import MessageInput from './components/MessageInput';
 import Evaluation from './components/Evaluation';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
+import ResizablePanes from './components/ResizablePanes';
 
 interface Model {
     model_id: string;
     model_name: string;
 }
+
+const FONT_SIZES = ['text-xs', 'text-sm', 'text-base', 'text-lg', 'text-xl'];
+const DEFAULT_FONT_SIZE = 'text-base';
+
+const useMediaQuery = (query: string): boolean => {
+    const [matches, setMatches] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.matchMedia(query).matches;
+        }
+        return false;
+    });
+
+    useEffect(() => {
+        const media = window.matchMedia(query);
+        const listener = () => setMatches(media.matches);
+        media.addEventListener('change', listener);
+        // Ensure the initial state is correct
+        if (media.matches !== matches) {
+            setMatches(media.matches);
+        }
+        return () => media.removeEventListener('change', listener);
+    }, [matches, query]);
+
+    return matches;
+};
 
 const App: React.FC = () => {
   // Common state
@@ -43,14 +69,17 @@ const App: React.FC = () => {
   const [helpfulScore, setHelpfulScore] = useState<number | null>(null);
   const [likedFeedback, setLikedFeedback] = useState<string | null>(null);
   const [improveFeedback, setImproveFeedback] = useState<string | null>(null);
-  const [chatFontSize, setChatFontSize] = useState<'sm' | 'base' | 'lg'>('sm');
-  const [caseFontSize, setCaseFontSize] = useState<'sm' | 'base' | 'lg'>('sm');
+  const [chatFontSize, setChatFontSize] = useState<string>('text-sm');
+  const [caseFontSize, setCaseFontSize] = useState<string>('text-sm');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [models, setModels] = useState<Model[]>([]);
   const [defaultModel, setDefaultModel] = useState<string | null>(null);
   const [selectedChatModel, setSelectedChatModel] = useState<string | null>(null);
   const [selectedSuperModel, setSelectedSuperModel] = useState<string | null>(null);
 
+  const isLargeScreen = useMediaQuery('(min-width: 1024px)');
+  const direction = isLargeScreen ? 'vertical' : 'horizontal';
+  const initialSize = isLargeScreen ? 33 : 50;
 
   useEffect(() => {
     // Handles client-side routing and auth state
@@ -157,10 +186,12 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const session = createChatSession(name, persona, modelId);
+      const firstMessageContent = `Hello ${name}, I am Kent Beck, the CEO of Malawi's Pizza. Thank you for meeting with me today. Our time is limited so let's get straight to my quandary: **Should we stay in the catering business, or is pizza catering a distraction from our core restaurant operations?**`;
+      const initialHistory: Message[] = [{ role: MessageRole.MODEL, content: firstMessageContent }];
+
+      const session = createChatSession(name, persona, modelId, initialHistory);
       setChatSession(session);
-      const firstMessage = `Hello ${name}, I am Kent Beck, the CEO of Malawi's Pizza. Thank you for meeting with me today. Our time is limited so let's get straight to my quandary: **Should we stay in the catering business, or is pizza catering a distraction from our core restaurant operations?**`;
-      setMessages([{ role: MessageRole.MODEL, content: firstMessage }]);
+      setMessages(initialHistory);
       setConversationPhase(ConversationPhase.CHATTING);
     } catch (e) {
       console.error("Failed to start conversation:", e);
@@ -283,8 +314,12 @@ const App: React.FC = () => {
       
       if (studentDBId) {
         const sanitizedLiked = sanitizeFeedback(likedFeedback);
-        // FIX: Corrected function call from `sanitize feedback` to `sanitizeFeedback`.
         const sanitizedImprove = sanitizeFeedback(improveFeedback);
+        
+        const transcript = messages.map(msg => {
+          const speaker = msg.role === MessageRole.USER ? fullName : 'CEO';
+          return `${speaker}: ${msg.content}`;
+        }).join('\n\n');
 
         const { data: evaluationData, error: evaluationError } = await supabase
           .from('evaluations')
@@ -300,6 +335,7 @@ const App: React.FC = () => {
             improve: sanitizedImprove,
             chat_model: selectedChatModel,
             super_model: selectedSuperModel,
+            transcript: transcript,
           })
           .select('created_at')
           .single();
@@ -517,26 +553,41 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="h-screen w-screen p-4 lg:p-6 flex flex-col lg:flex-row gap-4 lg:gap-6 font-sans">
-      <main className="lg:w-1/3 xl:w-1/4 h-1/2 lg:h-full">
-        <BusinessCase fontSize={caseFontSize} onFontSizeChange={setCaseFontSize} />
-      </main>
-      <aside className="lg:w-2/3 xl:w-3/4 h-1/2 lg:h-full flex flex-col bg-gray-200 rounded-xl shadow-lg">
-        {error && <div className="p-4 bg-red-500 text-white text-center font-semibold rounded-t-xl">{error}</div>}
-        <ChatWindow messages={messages} isLoading={isLoading} ceoPersona={ceoPersona} chatModelName={chatModelName} chatFontSize={chatFontSize} />
-        {conversationPhase === ConversationPhase.FEEDBACK_COMPLETE ? (
-            <div className="p-4 bg-white border-t border-gray-200 flex justify-center items-center">
-                <button
-                    onClick={handleProceedToEvaluation}
-                    className="px-6 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 animate-pulse"
-                >
-                    Click here to engage the AI Supervisor
-                </button>
-            </div>
-        ) : (
-            <MessageInput ref={inputRef} onSendMessage={handleSendMessage} isLoading={isLoading} chatFontSize={chatFontSize} onFontSizeChange={setChatFontSize} />
-        )}
-      </aside>
+    <div className="h-screen w-screen p-4 lg:p-6 font-sans bg-gray-100 overflow-hidden">
+      <ResizablePanes direction={direction} initialSize={initialSize}>
+        <div className="w-full h-full">
+          <BusinessCase 
+            fontSize={caseFontSize} 
+            onFontSizeChange={setCaseFontSize}
+            fontSizes={FONT_SIZES}
+            defaultFontSize={DEFAULT_FONT_SIZE}
+          />
+        </div>
+        <aside className="w-full h-full flex flex-col bg-gray-200 rounded-xl shadow-lg">
+          {error && <div className="p-4 bg-red-500 text-white text-center font-semibold rounded-t-xl">{error}</div>}
+          <ChatWindow messages={messages} isLoading={isLoading} ceoPersona={ceoPersona} chatModelName={chatModelName} chatFontSize={chatFontSize} />
+          {conversationPhase === ConversationPhase.FEEDBACK_COMPLETE ? (
+              <div className="p-4 bg-white border-t border-gray-200 flex justify-center items-center">
+                  <button
+                      onClick={handleProceedToEvaluation}
+                      className="px-6 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 animate-pulse"
+                  >
+                      Click here to engage the AI Supervisor
+                  </button>
+              </div>
+          ) : (
+              <MessageInput 
+                ref={inputRef} 
+                onSendMessage={handleSendMessage} 
+                isLoading={isLoading} 
+                chatFontSize={chatFontSize} 
+                onFontSizeChange={setChatFontSize}
+                fontSizes={FONT_SIZES}
+                defaultFontSize={DEFAULT_FONT_SIZE}
+              />
+          )}
+        </aside>
+      </ResizablePanes>
     </div>
   );
 };

@@ -107,4 +107,6 @@ Scaling the Process
 That June evening after the wedding reception, Evans sat in his office and thought about the last three years and about what he hoped for the next three years. The main Malawi's restaurant continued to grow in popularity, and managing its operations continued to consume most of his time. Beck had recently reminded Evans that he needed to expand the high-margin catering operation if possible, which could include increased marketing and perhaps hiring a part-time catering salesperson. The second Malawi's location occasionally borrowed the mobile oven, but with increased catering business would probably get their own. Also, the shift to franchising provided additional pressure to make the catering process both scalable and replicable.
 
 Evans pondered the idea of applying PCN Analysis to the catering operation. Questions he hoped to answer include: Given the highly interactive nature of catering and his integral role, how could Evans scale this operation without scaling his workload or hiring a full-time catering manager? How could they maintain a quality customer experience as they expanded and franchised? Could there be multiple methods of delivering catering services to meet different customer needs in different ways?
+
+_See the physical case for exhibits_
 `;

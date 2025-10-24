@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { getSystemPrompt, getCoachPrompt } from '../constants';
 import { Message, EvaluationResult, CEOPersona } from "../types";
@@ -14,12 +15,18 @@ const getAI = (): GoogleGenAI => {
     return ai;
 }
 
-export const createChatSession = (studentName: string, persona: CEOPersona, modelId: string): Chat => {
+export const createChatSession = (studentName: string, persona: CEOPersona, modelId: string, history: Message[] = []): Chat => {
     const genAI = getAI();
     const systemInstruction = getSystemPrompt(studentName, persona);
     
+    const formattedHistory = history.map(msg => ({
+        role: msg.role,
+        parts: [{ text: msg.content }]
+    }));
+
     const chat = genAI.chats.create({
         model: modelId,
+        history: formattedHistory,
         config: {
             systemInstruction: systemInstruction,
             temperature: 0.7,

@@ -1,5 +1,3 @@
-
-
 import React, { useRef, useEffect } from 'react';
 import { Message, MessageRole, CEOPersona } from '../types';
 
@@ -8,7 +6,7 @@ interface ChatWindowProps {
   isLoading: boolean;
   ceoPersona: CEOPersona;
   chatModelName: string | null;
-  chatFontSize: 'sm' | 'base' | 'lg';
+  chatFontSize: string;
 }
 
 const renderMessageContent = (content: string) => {
@@ -35,13 +33,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona
   const personaName = ceoPersona.charAt(0).toUpperCase() + ceoPersona.slice(1);
   const ceoTitle = `Kent Beck, ${personaName} CEO of Malawi's Pizza (AI model: ${chatModelName || '...'})`;
 
-  const fontSizeClass = {
-    sm: 'text-sm',
-    base: 'text-base',
-    lg: 'text-lg',
-  }[chatFontSize];
-
-
   return (
     <div className="flex-1 p-6 space-y-6 overflow-y-auto">
       {messages.map((msg, index) => (
@@ -66,7 +57,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona
                 : 'bg-white text-gray-800 rounded-bl-none'
             }`}
           >
-            <p className={fontSizeClass} style={{ whiteSpace: 'pre-wrap' }}>{renderMessageContent(msg.content)}</p>
+            <p className={chatFontSize} style={{ whiteSpace: 'pre-wrap' }}>{renderMessageContent(msg.content)}</p>
           </div>
         </div>
       ))}

@@ -43,6 +43,8 @@ const App: React.FC = () => {
   const [helpfulScore, setHelpfulScore] = useState<number | null>(null);
   const [likedFeedback, setLikedFeedback] = useState<string | null>(null);
   const [improveFeedback, setImproveFeedback] = useState<string | null>(null);
+  const [chatFontSize, setChatFontSize] = useState<'sm' | 'base' | 'lg'>('sm');
+  const [caseFontSize, setCaseFontSize] = useState<'sm' | 'base' | 'lg'>('sm');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [models, setModels] = useState<Model[]>([]);
   const [defaultModel, setDefaultModel] = useState<string | null>(null);
@@ -517,11 +519,11 @@ const App: React.FC = () => {
   return (
     <div className="h-screen w-screen p-4 lg:p-6 flex flex-col lg:flex-row gap-4 lg:gap-6 font-sans">
       <main className="lg:w-1/3 xl:w-1/4 h-1/2 lg:h-full">
-        <BusinessCase />
+        <BusinessCase fontSize={caseFontSize} onFontSizeChange={setCaseFontSize} />
       </main>
       <aside className="lg:w-2/3 xl:w-3/4 h-1/2 lg:h-full flex flex-col bg-gray-200 rounded-xl shadow-lg">
         {error && <div className="p-4 bg-red-500 text-white text-center font-semibold rounded-t-xl">{error}</div>}
-        <ChatWindow messages={messages} isLoading={isLoading} ceoPersona={ceoPersona} chatModelName={chatModelName} />
+        <ChatWindow messages={messages} isLoading={isLoading} ceoPersona={ceoPersona} chatModelName={chatModelName} chatFontSize={chatFontSize} />
         {conversationPhase === ConversationPhase.FEEDBACK_COMPLETE ? (
             <div className="p-4 bg-white border-t border-gray-200 flex justify-center items-center">
                 <button
@@ -532,7 +534,7 @@ const App: React.FC = () => {
                 </button>
             </div>
         ) : (
-            <MessageInput ref={inputRef} onSendMessage={handleSendMessage} isLoading={isLoading} />
+            <MessageInput ref={inputRef} onSendMessage={handleSendMessage} isLoading={isLoading} chatFontSize={chatFontSize} onFontSizeChange={setChatFontSize} />
         )}
       </aside>
     </div>

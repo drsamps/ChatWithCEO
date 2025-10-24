@@ -8,6 +8,7 @@ interface ChatWindowProps {
   isLoading: boolean;
   ceoPersona: CEOPersona;
   chatModelName: string | null;
+  chatFontSize: 'sm' | 'base' | 'lg';
 }
 
 const renderMessageContent = (content: string) => {
@@ -20,7 +21,7 @@ const renderMessageContent = (content: string) => {
   });
 };
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona, chatModelName }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona, chatModelName, chatFontSize }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -33,6 +34,12 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona
 
   const personaName = ceoPersona.charAt(0).toUpperCase() + ceoPersona.slice(1);
   const ceoTitle = `Kent Beck, ${personaName} CEO of Malawi's Pizza (AI model: ${chatModelName || '...'})`;
+
+  const fontSizeClass = {
+    sm: 'text-sm',
+    base: 'text-base',
+    lg: 'text-lg',
+  }[chatFontSize];
 
 
   return (
@@ -59,7 +66,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, isLoading, ceoPersona
                 : 'bg-white text-gray-800 rounded-bl-none'
             }`}
           >
-            <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{renderMessageContent(msg.content)}</p>
+            <p className={fontSizeClass} style={{ whiteSpace: 'pre-wrap' }}>{renderMessageContent(msg.content)}</p>
           </div>
         </div>
       ))}

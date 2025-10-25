@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Chat, Type } from "@google/genai";
 import { getSystemPrompt, getCoachPrompt } from '../constants';
 import { Message, EvaluationResult, CEOPersona } from "../types";
@@ -39,7 +40,7 @@ export const createChatSession = (studentName: string, persona: CEOPersona, mode
 
 export const getEvaluation = async (messages: Message[], studentFirstName: string, studentFullName: string, modelId: string): Promise<EvaluationResult> => {
     const genAI = getAI();
-    const chatHistory = messages.map(msg => `${msg.role === 'user' ? studentFirstName : 'CEO'}: ${msg.content}`).join('\n\n');
+    const chatHistory = messages.map(msg => `${msg.role === 'user' ? 'Student' : 'CEO'}: ${msg.content}`).join('\n\n');
     const prompt = getCoachPrompt(chatHistory, studentFullName);
 
     const response = await genAI.models.generateContent({

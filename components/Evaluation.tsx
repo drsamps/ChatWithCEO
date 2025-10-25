@@ -36,7 +36,7 @@ const Evaluation: React.FC<EvaluationProps> = ({ result, studentName, onRestart,
         </div>
         
         <div className="p-4 bg-blue-50 rounded-lg">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Coach's Summary</h2>
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Supervisor's Summary</h2>
             <p className="text-gray-700">{result.summary}</p>
         </div>
 

@@ -69,6 +69,7 @@ const App: React.FC = () => {
   const [helpfulScore, setHelpfulScore] = useState<number | null>(null);
   const [likedFeedback, setLikedFeedback] = useState<string | null>(null);
   const [improveFeedback, setImproveFeedback] = useState<string | null>(null);
+  const [shareTranscript, setShareTranscript] = useState<boolean>(false);
   const [chatFontSize, setChatFontSize] = useState<string>('text-sm');
   const [caseFontSize, setCaseFontSize] = useState<string>('text-sm');
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -241,7 +242,7 @@ const App: React.FC = () => {
         const userReply: Message = { role: MessageRole.USER, content: userMessage };
         setMessages(prev => [...prev, userReply]);
         
-        const affirmative = ['yes', 'sure', 'ok', 'yeah', 'yep', 'absolutely', 'i would', 'of course'].some(word => userMessage.toLowerCase().includes(word));
+        const affirmative = ['yes', 'y', 'sure', 'ok', 'yeah', 'yep', 'absolutely', 'i would', 'of course'].some(word => userMessage.toLowerCase().includes(word));
         
         if (affirmative) {
             const ceoScoreRequest: Message = {
@@ -251,8 +252,13 @@ const App: React.FC = () => {
             setMessages(prev => [...prev, ceoScoreRequest]);
             setConversationPhase(ConversationPhase.AWAITING_HELPFUL_SCORE);
         } else {
-            // Student declined, proceed directly to evaluation without feedback.
-            await handleProceedToEvaluation();
+            // Student declined feedback, proceed to ask for transcript permission.
+            const ceoTranscriptRequest: Message = {
+                role: MessageRole.MODEL,
+                content: "It has been a delight talking with you today. **Would you be willing to let me pass this conversation transcript to the developers to help improve the simulated conversations for future students?** The conversation will be completely anonymized (your name will be removed). This would be **a big help** in developing this AI chat case teaching tool 😊."
+            };
+            setMessages(prev => [...prev, ceoTranscriptRequest]);
+            setConversationPhase(ConversationPhase.AWAITING_TRANSCRIPT_PERMISSION);
         }
     } else if (conversationPhase === ConversationPhase.AWAITING_HELPFUL_SCORE) {
         const userScoreReply: Message = { role: MessageRole.USER, content: userMessage };
@@ -287,11 +293,25 @@ const App: React.FC = () => {
         const userImproveReply: Message = { role: MessageRole.USER, content: userMessage };
         setImproveFeedback(userMessage);
 
+        const ceoTranscriptRequest: Message = {
+            role: MessageRole.MODEL,
+            content: "It has been a delight talking with you today. **Would you be willing to let me pass this conversation transcript to the developers to help improve the simulated conversations for future students?** The conversation will be completely anonymized (your name will be removed). This would be **a big help** in developing this AI chat case teaching tool 😊.",
+        };
+        setMessages(prev => [...prev, userImproveReply, ceoTranscriptRequest]);
+        setConversationPhase(ConversationPhase.AWAITING_TRANSCRIPT_PERMISSION);
+    } else if (conversationPhase === ConversationPhase.AWAITING_TRANSCRIPT_PERMISSION) {
+        const userTranscriptReply: Message = { role: MessageRole.USER, content: userMessage };
+        
+        const affirmative = ['yes', 'y', 'sure', 'ok', 'yeah', 'yep', 'absolutely', 'i would', 'of course'].some(word => userMessage.toLowerCase().includes(word));
+        if (affirmative) {
+            setShareTranscript(true);
+        }
+
         const ceoGoodbyeMessage: Message = {
             role: MessageRole.MODEL,
-            content: `Thank you for your feedback, ${studentFirstName}. Goodbye and have a nice day. I am going to turn this over to the AI Supervisor to give you feedback.`,
+            content: `Thank you for your time, ${studentFirstName}. Goodbye and have a nice day. I am going to turn this over to the AI Supervisor to give you feedback.`,
         };
-        setMessages(prev => [...prev, userImproveReply, ceoGoodbyeMessage]);
+        setMessages(prev => [...prev, userTranscriptReply, ceoGoodbyeMessage]);
         setConversationPhase(ConversationPhase.FEEDBACK_COMPLETE);
     }
   };
@@ -315,13 +335,22 @@ const App: React.FC = () => {
       if (studentDBId) {
         const sanitizedLiked = sanitizeFeedback(likedFeedback);
         const sanitizedImprove = sanitizeFeedback(improveFeedback);
-        
-        const transcript = messages.map(msg => {
-          const speaker = msg.role === MessageRole.USER ? fullName : 'CEO';
-          return `${speaker}: ${msg.content}`;
-        }).join('\n\n');
 
-        const { data: evaluationData, error: evaluationError } = await supabase
+        let transcriptToSave: string | null = null;
+        if (shareTranscript) {
+          const transcript = messages.map(msg => {
+            const speaker = msg.role === MessageRole.USER ? fullName : 'CEO';
+            return `${speaker}: ${msg.content}`;
+          }).join('\n\n');
+
+          // Anonymize the transcript
+          const nameRegex = new RegExp(`\\b(${fullName}|${tempFirstName.trim()}|${tempLastName.trim()})\\b`, 'gi');
+          transcriptToSave = transcript.replace(nameRegex, 'STUDENT');
+        }
+
+        const finishedTimestamp = new Date().toISOString();
+
+        const { error: evaluationError } = await supabase
           .from('evaluations')
           .insert({
             student_id: studentDBId,
@@ -335,21 +364,17 @@ const App: React.FC = () => {
             improve: sanitizedImprove,
             chat_model: selectedChatModel,
             super_model: selectedSuperModel,
-            transcript: transcript,
-          })
-          .select('created_at')
-          .single();
+            transcript: transcriptToSave,
+          });
 
         if (evaluationError) {
           console.error("Error saving evaluation:", evaluationError);
-        } else if (evaluationData) {
+        } else {
           // If evaluation is saved, try to update the student's finished_at timestamp
-          // using the timestamp from the evaluation record for consistency.
           const { error: studentUpdateError } = await supabase
             .from('students')
-            .update({ finished_at: evaluationData.created_at })
-            .eq('id', studentDBId)
-            .select();
+            .update({ finished_at: finishedTimestamp })
+            .eq('id', studentDBId);
           if (studentUpdateError) console.error("Error updating student finished_at timestamp:", studentUpdateError);
         }
       }
@@ -437,6 +462,7 @@ const App: React.FC = () => {
     setHelpfulScore(null);
     setLikedFeedback(null);
     setImproveFeedback(null);
+    setShareTranscript(false);
     setSelectedChatModel(defaultModel);
     setSelectedSuperModel(defaultModel);
   };
@@ -535,6 +561,7 @@ const App: React.FC = () => {
                     <option value={CEOPersona.SYCOPHANTIC}>Sycophantic</option>
                 </select>
             </div>
+            <p className="text-xs text-gray-500 italic px-2">You can optionally and anonymously share your chat conversation with the developers to improve the dialog for future students. You will be asked about this later.</p>
             {error && <p className="text-sm text-red-600">{error}</p>}
             <button type="submit" disabled={isLoading || !tempFirstName.trim() || !tempLastName.trim() || !isSectionValid} className="w-full px-4 py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400">
               {isLoading ? 'Initializing...' : 'Start Chat'}

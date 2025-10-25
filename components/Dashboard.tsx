@@ -29,6 +29,17 @@ interface StudentDetail {
   super_model: string | null;
 }
 
+// FIX: Added an interface for the evaluation data to ensure type safety.
+interface EvaluationData {
+  student_id: string;
+  score: number | null;
+  hints: number | null;
+  helpful: number | null;
+  created_at: string;
+  chat_model: string | null;
+  super_model: string | null;
+}
+
 type SortKey = 'full_name' | 'persona' | 'score' | 'hints' | 'helpful' | 'completion_time' | 'chat_model' | 'super_model';
 type SortDirection = 'asc' | 'desc';
 
@@ -221,7 +232,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     }
     
     // Step 3: Join the data on the client-side.
-    const evaluationsMap = new Map(evaluationsData.map(e => [e.student_id, e]));
+    const evaluationsMap = new Map<string, EvaluationData>();
+    if (Array.isArray(evaluationsData)) {
+      for (const e of evaluationsData) {
+        // FIX: Correctly typed the evaluationsMap to resolve errors when accessing evaluation properties.
+        // This also adds a null check to prevent potential runtime errors if the data array contains nullish values.
+        if (e && e.student_id) {
+          evaluationsMap.set(e.student_id, e as EvaluationData);
+        }
+      }
+    }
     
     const combinedDetails = studentsData.map(student => {
       const evaluation = evaluationsMap.get(student.id);

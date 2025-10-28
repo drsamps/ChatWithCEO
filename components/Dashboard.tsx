@@ -304,6 +304,174 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     });
   }, [studentDetails, sortKey, sortDirection, showOnlyCompleted]);
 
+  // Export to MySQL helpers and action
+  const [isExporting, setIsExporting] = useState(false);
+
+  const sqlEscapeString = (value: string): string => {
+    return value
+      .replace(/\\/g, "\\\\")
+      .replace(/\u0000/g, "")
+      .replace(/\n/g, "\\n")
+      .replace(/\r/g, "\\r")
+      .replace(/\t/g, "\\t")
+      .replace(/\u001a/g, "")
+      .replace(/'/g, "\\'");
+  };
+
+  const sqlValue = (val: any): string => {
+    if (val === null || val === undefined) return 'NULL';
+    if (typeof val === 'number') return Number.isFinite(val) ? String(val) : 'NULL';
+    if (typeof val === 'boolean') return val ? '1' : '0';
+    if (val instanceof Date) return `'${sqlEscapeString(val.toISOString().slice(0, 19).replace('T', ' '))}'`;
+    // handle ISO date strings
+    if (typeof val === 'string') {
+      // try to normalize ISO timestamps to 'YYYY-MM-DD HH:MM:SS'
+      const d = new Date(val);
+      if (!isNaN(d.getTime()) && /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+        const ts = d.toISOString().slice(0, 19).replace('T', ' ');
+        return `'${sqlEscapeString(ts)}'`;
+      }
+      return `'${sqlEscapeString(val)}'`;
+    }
+    // JSON/object
+    try {
+      const json = JSON.stringify(val);
+      return json === undefined ? 'NULL' : `'${sqlEscapeString(json)}'`;
+    } catch {
+      return 'NULL';
+    }
+  };
+
+  const handleDownloadToMySQL = useCallback(async () => {
+    if (isExporting) return;
+    const confirmed = window.confirm('Download SQL to upsert data into MySQL (models, sections, students, evaluations)?');
+    if (!confirmed) return;
+    setIsExporting(true);
+    try {
+      // Fetch all tables (exclude admins)
+      const [modelsRes, sectionsRes, studentsRes, evalsRes] = await Promise.all([
+        supabase.from('models').select('*'),
+        supabase.from('sections').select('*'),
+        supabase.from('students').select('*'),
+        supabase.from('evaluations').select('*'),
+      ]);
+
+      const errors: string[] = [];
+      if (modelsRes.error) errors.push(`models: ${modelsRes.error.message}`);
+      if (sectionsRes.error) errors.push(`sections: ${sectionsRes.error.message}`);
+      if (studentsRes.error) errors.push(`students: ${studentsRes.error.message}`);
+      if (evalsRes.error) errors.push(`evaluations: ${evalsRes.error.message}`);
+      if (errors.length) {
+        alert('Failed to fetch some data from Supabase:\n' + errors.join('\n'));
+        setIsExporting(false);
+        return;
+      }
+
+      const models = modelsRes.data || [];
+      const sections = sectionsRes.data || [];
+      const students = studentsRes.data || [];
+      const evaluations = evalsRes.data || [];
+
+      const lines: string[] = [];
+      lines.push('-- Upsert script for ceochat (MySQL)');
+      lines.push('USE ceochat;');
+      lines.push('SET FOREIGN_KEY_CHECKS=0;');
+
+      // models
+      for (const m of models) {
+        const cols = ['model_id','model_name','enabled','default_model','input_cost','output_cost'];
+        const vals = [
+          sqlValue(m.model_id),
+          sqlValue(m.model_name),
+          sqlValue(m.enabled),
+          // Supabase has column named 'default'; map to MySQL 'default_model'
+          sqlValue((m as any).default),
+          sqlValue(m.input_cost),
+          sqlValue(m.output_cost),
+        ];
+        const updates = ['model_name=VALUES(model_name)','enabled=VALUES(enabled)','default_model=VALUES(default_model)','input_cost=VALUES(input_cost)','output_cost=VALUES(output_cost)'];
+        lines.push(`INSERT INTO models (${cols.join(',')}) VALUES (${vals.join(',')}) ON DUPLICATE KEY UPDATE ${updates.join(',')};`);
+      }
+
+      // sections
+      for (const s of sections) {
+        const cols = ['section_id','created_at','section_title','year_term','enabled','chat_model','super_model'];
+        const vals = [
+          sqlValue(s.section_id),
+          sqlValue(s.created_at),
+          sqlValue(s.section_title),
+          sqlValue(s.year_term),
+          sqlValue(s.enabled),
+          sqlValue(s.chat_model),
+          sqlValue(s.super_model),
+        ];
+        const updates = ['created_at=VALUES(created_at)','section_title=VALUES(section_title)','year_term=VALUES(year_term)','enabled=VALUES(enabled)','chat_model=VALUES(chat_model)','super_model=VALUES(super_model)'];
+        lines.push(`INSERT INTO sections (${cols.join(',')}) VALUES (${vals.join(',')}) ON DUPLICATE KEY UPDATE ${updates.join(',')};`);
+      }
+
+      // students
+      for (const st of students) {
+        const cols = ['id','created_at','first_name','last_name','full_name','persona','section_id','finished_at'];
+        const vals = [
+          sqlValue(st.id),
+          sqlValue(st.created_at),
+          sqlValue(st.first_name),
+          sqlValue(st.last_name),
+          sqlValue(st.full_name),
+          sqlValue(st.persona),
+          sqlValue(st.section_id),
+          sqlValue(st.finished_at),
+        ];
+        const updates = ['created_at=VALUES(created_at)','first_name=VALUES(first_name)','last_name=VALUES(last_name)','full_name=VALUES(full_name)','persona=VALUES(persona)','section_id=VALUES(section_id)','finished_at=VALUES(finished_at)'];
+        lines.push(`INSERT INTO students (${cols.join(',')}) VALUES (${vals.join(',')}) ON DUPLICATE KEY UPDATE ${updates.join(',')};`);
+      }
+
+      // evaluations
+      for (const e of evaluations) {
+        const cols = ['id','created_at','student_id','score','summary','criteria','persona','hints','helpful','liked','improve','chat_model','super_model','transcript'];
+        const vals = [
+          sqlValue(e.id),
+          sqlValue(e.created_at),
+          sqlValue(e.student_id),
+          sqlValue(e.score),
+          sqlValue(e.summary),
+          // criteria is JSON
+          sqlValue(e.criteria),
+          sqlValue(e.persona),
+          sqlValue(e.hints),
+          sqlValue(e.helpful),
+          sqlValue(e.liked),
+          sqlValue(e.improve),
+          sqlValue(e.chat_model),
+          sqlValue(e.super_model),
+          sqlValue(e.transcript),
+        ];
+        const updates = ['created_at=VALUES(created_at)','student_id=VALUES(student_id)','score=VALUES(score)','summary=VALUES(summary)','criteria=VALUES(criteria)','persona=VALUES(persona)','hints=VALUES(hints)','helpful=VALUES(helpful)','liked=VALUES(liked)','improve=VALUES(improve)','chat_model=VALUES(chat_model)','super_model=VALUES(super_model)','transcript=VALUES(transcript)'];
+        lines.push(`INSERT INTO evaluations (${cols.join(',')}) VALUES (${vals.join(',')}) ON DUPLICATE KEY UPDATE ${updates.join(',')};`);
+      }
+
+      lines.push('SET FOREIGN_KEY_CHECKS=1;');
+
+      const content = lines.join('\n');
+      const blob = new Blob([content], { type: 'text/sql;charset=utf-8' });
+      const a = document.createElement('a');
+      const ts = new Date();
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      const fname = `ceochat-upsert-${ts.getFullYear()}${pad(ts.getMonth()+1)}${pad(ts.getDate())}-${pad(ts.getHours())}${pad(ts.getMinutes())}.sql`;
+      a.href = URL.createObjectURL(blob);
+      a.download = fname;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(a.href);
+    } catch (err: any) {
+      console.error('Export to MySQL failed', err);
+      alert('Export failed. See console for details.');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [isExporting]);
+
   const SortableHeader = ({ label, sortableKey }: { label: string; sortableKey: SortKey }) => (
     <th
       onClick={() => handleSort(sortableKey)}
@@ -372,6 +540,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           {isLoadingSections && !sectionStats.length ? (
             <div className="text-center p-4 text-gray-500">Loading sections...</div>
           ) : (
+          <>
             <ul className="space-y-1">
               {sectionStats.map(section => (
                 <li key={section.section_id}>
@@ -392,6 +561,28 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                 </li>
               ))}
             </ul>
+            <div className="mt-4 p-2 border-t">
+              <button
+                onClick={handleDownloadToMySQL}
+                disabled={isExporting}
+                className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md text-white ${isExporting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} transition-colors`}
+                title="Generate a .sql file to upsert data into MySQL"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M3 3.5A1.5 1.5 0 014.5 2h11A1.5 1.5 0 0117 3.5v7a1.5 1.5 0 01-1.5 1.5H12l-2 2-2-2H4.5A1.5 1.5 0 013 10.5v-7zm2 1a.5.5 0 00-.5.5v5A.5.5 0 005 10h10a.5.5 0 00.5-.5v-5a.5.5 0 00-.5-.5H5z" clipRule="evenodd" />
+                </svg>
+                {isExporting ? 'Preparing SQL…' : 'Download to MySQL'}
+              </button>
+              <p className="mt-1 text-xs text-gray-500">Exports models, sections, students, evaluations. Admins are not exported.</p>
+              <a
+                href="./docs/mysql-database-structure-Oct2025.sql"
+                download
+                className="mt-2 inline-flex items-center text-sm text-blue-600 hover:text-blue-800 hover:underline"
+              >
+                Download MySQL ceochat table structure
+              </a>
+            </div>
+          </>
           )}
         </nav>
         <main className="flex-1 p-6 overflow-y-auto">

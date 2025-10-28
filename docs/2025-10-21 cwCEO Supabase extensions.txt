@@ -1,0 +1,109 @@
+10/21/2025
+ceochat enhancements
+
+Supabase/Sampsons AI for Business/Chat with CEO/KentBeckTallHat
+
+[10/21/2025]==========
+
+Instead of asking for "Your Name" it would be better to ask for "First name (or name you go by)" and "Last name".  The simulated CEO should refer to the student by first name.
+Initial screen should be titled "Chat with the CEO"
+You will have a brief opportunity to chat with the (simulated) CEO about the case. Enter your first and last name to begin."
+
+[10/21/2025]=========
+It would be nice if the students names are stored in a database so that the instructor can see which students have logged in. Then, after students complete the simulation, it would be nice if the Coach ratings were also stored in that database, allowing the instructor to view them through a dashboard. I realize this app is currently designed for frontside. Would it be possible to use a backend database service Supabase to store the student data and allow the instructor to see the status of students using the simulation? Just give me an assessment of how complicated this would be and how it would be done.
+
+
+
+[10/21/2025]=============
+The coach evaluation questions are each out of 5 possible points, not out of 3 (as reported to the student).  Also, the CEO is way too demanding of the student in terms of citing case facts. Can the instructor/admin set up a few different modes or personalities of the simulated CEO:
+ * strict: what we currently have which is that students need to be precise about citing case facts.
+ * moderate: give student more credit for citing case facts, even if their references to case facts are good but not highly precise.
+ * liberal: let the students say anything they want that relates to the case, and have the simulated CEO somehow tie the student comments into the case.
+It would be nice if the instructor could select the CEO persona, or optionally allow each student to select which CEO persona they want to use at the time of entering their name. The used CEO persona should be stored both in the "students" data table (at sign-in) and in the "evaluations" data table (after coach evaluation).
+
+[10/21/2025]===== 
+When students sign in, they are asked their names and CEO Persona (which should be labeled "CEO Personality"). Between the names and the CEO Persona add a selector for "What course section are you in?" with a dropdown list of sections from a Supabase "sections" data table (or an "Other" option that lets the student type in a course name). The "sections" data table should include fields for:
+* section_id (string up to 20 characters, indexed)
+* section_title (string up to 100 characters)
+* year_term (string up to 20 characters)
+* enabled (true if it should show up on the student options)
+Of course, the "students" data table should also include a "section_id" field to record which section the student selected (or "other:{14 characters of what they entered}")
+
+[10/21/2025]=============
+
+I would like the Supabase "evaluations" table to also keep track of how many hints each student requested. Add a "hints" column to the data table and include "hints" in a valid JSON schema.
+
+
+[10/21/2025]===========
+When a student starts we record the created_at in the "students" data table. It would be nice if the "students" data table also contained a finished_at timestamp of when they complete the simulation and get their score from the coach.
+
+[skip - might allow people to repeat the exercise]=============
+I tried the app twice using the same name "Professor Sampson" and it created two records in the Supabase "students" data table. Is there any way to prevent the same student from showing up multiple times in the data table?
+
+
+[10/21/2025]==============
+How could I get an instructor dashboard to see student progress from the Supabase data files? Does Supabase provide dashboards or do we need to create it in code? The dashboard would certainly require instructor/admin login - maybe we could create an "admins" data table that would list admins and their encrypted passwords.
+
+It would be nice if the dashboard would show each enabled section and how many starts and completions for the sections.
+If the admin clicks on a section, it would be good to list students from the section, sorted either by completion time or by total points.  The list of students should include their names, their scores, and how many hints they needed.
+
+[10/21/2025]===========
+We need a couple of additional CEO Personas to choose from:
+"Leading" which leads students along giving them overt hints about relevant case facts and looking for any value, though obscure, in student comments, being liberal to praise students at every opportunity.
+"Sycophantic" which praises students for everything they say even it if is completely absurd, ignoring case facts and ignoring reality, finding ways to compliment students on any ideas regardless of how hairbrained the ideas may be.
+
+[10/21/2025]=========
+The admin "Instructor Dashboard" has a "Course Sections" list that needs a "refresh" button next to it to refresh the list of courses and number of completions.  Also, the list of completions needs to include the CEO Persona between the Student Name and the Score columns, and the "Completion Time" column needs to be recorded in the "evaluations" data table so that it shows up in that report (instead of saying "Not Completed" all the time even when completed).
+
+[10/21/2025]============
+When "time is up" rather than going directly into the Coach evaluation, it would be better to first have the simulated CEO say to the student: "{name}, thank you for meeting with me. I am glad you were able to study this case and share your insights. I hope our conversation was challenging but helpful. Would you be willing to give me a rating for my AI CEO profile?"
+If the student replies in the affirmative, respond with "On a scale of 1 to 5, where 5 means most helpful, how helpful was our conversation in helping you think about case facts?" If the student provides a score, record the score in a variable that will be combined with the subsequent Coach evaluation. The student helpful score will be store with the Coach evaluation values in the "evaluations" data table in a numeric "helpful" column, otherwise leave the "helpful" column at null.  Report the "helpful" column in the dashboard response list to the right of the "hints" column.
+
+[10/22/2025]===========
+After an admin has logged in to the Instructor Dashboard, it would be good to provide a "to Supabase" link next to the Instructor Dashboard title that opens Supabase in a separate target="supabase" browser tab.  The URL is: https://supabase.com/dashboard/project/mytexuyqwuoyncdlaflq
+It seems that this is still secure because a random user finding this would still need to log into supabase in order to access the project tables.  Correct?
+
+[10/22/2025]======
+Oddly, the evaluations list shows NA values in a gray font and numerical values for "score" or "hints" or "helpful" showing up with a white font, thus invisible (see attached, which has a score selected to show it is there).  Better to make all of those fonts black for good contrast.
+
+[10/22/2025]=============
+After the conversation we ask the student if they can provide feedback. If the student agrees, we ask how helpful the conversation was in thinking through this case situation?
+After the student provides their helpfulness rating, ask the student two additional questions (one at a time) and store their responses in text fields in the evaluations data table:
+1. What did you **like most** about this simulated conversation? (store student answer in a new "liked" column of the "evaluations" table)
+2. What way do you think this simulated conversation **might be improved**? (store store student answer in a new "improve" column of the "evaluations" table)
+Then thank the student (by name) for their feedback and say "Goodbye, have a nice day. I am going to turn this over to the AI Supervisor to give you feedback." Then provide a button labeled "Click here to engage the AI Supervisor" that pulsates mildly. When they click that button proceed to the Coach assessment.  (I am referring to the Coach as an "AI Supervisor")
+Be sure and give me the Supabase SQL to add those columns to the "evaluations" data table.
+
+
+--------
+
+Bold the phrase "Would you be willing to provide feedback by answering a few questions about our interaction?"
+
+The phrases **like most** and **might be improved** need to be bold text (no asterisks).
+
+The "Click here to engage the AI Supervisor" needs to have a more prominent background color, such as a dark shade of orange.
+
+[]=====
+To provide bold text in CEO messages, instead of "renderMessageContent" acting on **bold** phrases would it have been easier to simply include <strong></strong> tags in the text?
+
+(but that would not render bold coming from the LLM)
+
+[10/22/2025]===========
+
+The CEO chats are identified onscreen with "CEO" in a circle. It would be better to have the CEO's initials "KB" in the circle with a mouseover tooltip of "Kent Beck, {selected CEO Persona} CEO of Malawi's Pizza"
+
+To start the conversation the CEO says "Hello Scott. Let's get straight to it. Should we stay in the catering business, or is it a distraction from our core restaurant operations?"
+It would be better if the CEO says "Hello {first name}, I am Kent Beck, the CEO of Malawi's Pizza. Thank you for meeting with me today. Our time is limited so let's get straight to my quandary: **Should we stay in the catering business, or is pizza catering a distraction from our core restaurant operations?**"
+
+
+[x]--- also edit
+Great! On a scale of 1 to 5...
+Goodbye, have a nice day. 
+
+[10/22/2025]====
+To prevent prompt injection, do not allow students to enter names with special characters that are not a usual part of names.
+To prevent SQL injection, when accepting the student "liked most" and "improve" suggestions, filter out any characters that could cause a problem with the SQL.
+
+========= time is up
+maybe also use: out of time
+

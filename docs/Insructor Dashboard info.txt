@@ -1,0 +1,39 @@
+10/21/2025
+Chat with CEO
+Insructor Dashboard
+
+published on Google Cloud...
+https://ceo-business-case-chat-simulator-962957134935.us-west1.run.app/#/admin
+
+sampsonsclass@gmail.com
+
+
+Loaded on sampson1
+sampson@sampson1:/var/www/services_root/html$ git clone git@github.com:drsamps/ChatWithCEO.git
+Cloning into 'ChatWithCEO'...
+remote: Enumerating objects: 70, done.
+remote: Counting objects: 100% (70/70), done.
+remote: Compressing objects: 100% (63/63), done.
+remote: Total 70 (delta 28), reused 14 (delta 5), pack-reused 0 (from 0)
+Receiving objects: 100% (70/70), 63.74 KiB | 1.06 MiB/s, done.
+Resolving deltas: 100% (28/28), done.
+
+====
+10/21/2025
+App successfully deployed to Google Cloud
+Your code has been deployed as a Cloud Run service that is now ready to use. You can now view your application UI and customize it.
+
+App URL
+https://ceo-business-case-chat-simulator-962957134935.us-west1.run.app
+
+This app is using the following API key
+...2DHk
+
+Open in Google Cloud
+
+
+AIzaSyBAlXKkWP60uELtW0LAh8CTTFKJhRC2DHk
+(these key changes with every re-deploy)
+[10/22/2025]====
+It would be nice if the app allowed the user to control-click on the "Chat with the CEO" title to automatically go to the Admin screen to login and see the Instructor Dashboard. This should be subtle, keeping the mouse pointer the same, a tooltip of simply "admin", and with clicking on the title doing nothing.
+Also, the Instructor Dashboard login should have a "to Chatbot" link at the bottom that returns to the student screen.

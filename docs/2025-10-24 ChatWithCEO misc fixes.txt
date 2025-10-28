@@ -1,0 +1,22 @@
+10/24/2025
+I rolled-back these due to the 'evaluations' save error.
+Thus they need to be redone once I get the evaluations save working again.
+
+
+==> Ha, they were already in.
+
+[10/25/2025]==========
+At the bottom of the case it would be good to include an italicized note "See the physical case for exhibits"
+
+[10/24/2025]===========
+The font size controls to the right of the case title and Send button have three sizes: small, medium, and large. It would be better to have a [-]font[+] control that has a reduce button "-" the word font and a font increase button "+" that looks simple and nice. Clicking on "font" will return to normal size. Allow a range of at least five different font sizes.
+
+[10/24/2025]================
+Would it be possible when saving evaluation to also save the entire conversation history to a "transcript" text field in the "evaluations" data table? I will need the Supabase SQL to add that field.
+
+[10/24/2025]==============		
+Suddenly you are starting to put the CEO chats in quotes. Why? User does not need to see quotes around CEO chats unless the CEO is quoting something from the case. See attached image.
+
+
+
+
